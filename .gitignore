@@ -1,3 +1,15 @@
+#################
+## Eclipse
+#################
+
+SiegeMode/*
+!SiegeMode/gradlew
+!SiegeMode/gradlew.bat
+!SiegeMode/build.gradle
+!SiegeMode/build.bat
+!SiegeMode/gradle/
+!SiegeMode/src/
+
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
