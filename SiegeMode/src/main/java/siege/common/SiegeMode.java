@@ -4,19 +4,33 @@ import java.io.*;
 
 import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.MinecraftForge;
 import siege.common.kit.*;
+import siege.common.siege.SiegeDatabase;
+import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
 @Mod(modid = "siegemode", version = "1.0", acceptableRemoteVersions = "*")
 public class SiegeMode
 {
+	private EventHandler eventHandler;
+	
+	@Mod.EventHandler
+	public void load(FMLInitializationEvent event)
+	{
+		eventHandler = new EventHandler();
+		FMLCommonHandler.instance().bus().register(eventHandler);
+		MinecraftForge.EVENT_BUS.register(eventHandler);
+	}
+	
 	@Mod.EventHandler
 	public void onServerStarting(FMLServerStartingEvent event)
 	{
 		KitDatabase.reloadAll();
+		SiegeDatabase.reloadAll();
 		event.registerServerCommand(new CommandKit());
 		event.registerServerCommand(new CommandKitCreate());
 	}
