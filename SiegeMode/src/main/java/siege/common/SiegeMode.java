@@ -7,7 +7,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.MinecraftForge;
 import siege.common.kit.*;
-import siege.common.siege.SiegeDatabase;
+import siege.common.siege.*;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -33,6 +33,8 @@ public class SiegeMode
 		SiegeDatabase.reloadAll();
 		event.registerServerCommand(new CommandKit());
 		event.registerServerCommand(new CommandKitCreate());
+		event.registerServerCommand(new CommandSiegeSetup());
+		event.registerServerCommand(new CommandSiegePlay());
 	}
 	
 	public static File getSiegeRootDirectory()

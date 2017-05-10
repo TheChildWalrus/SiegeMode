@@ -14,21 +14,40 @@ import cpw.mods.fml.common.FMLLog;
 
 public class SiegeDatabase
 {
-	private static Map<String, Siege> siegeMap = new HashMap();
-	
+	private static Map<UUID, Siege> siegeMap = new HashMap();
+	private static Map<String, UUID> siegeNameMap = new HashMap();
+
 	public static Siege getSiege(String name)
 	{
-		return siegeMap.get(name);
+		return siegeMap.get(getSiegeNameID(name));
+	}
+	
+	public static UUID getSiegeNameID(String name)
+	{
+		return siegeNameMap.get(name);
 	}
 	
 	public static boolean siegeExists(String name)
 	{
-		return siegeMap.get(name) != null;
+		return getSiege(name) != null;
 	}
 	
 	public static List<String> getAllSiegeNames()
 	{
-		return new ArrayList(siegeMap.keySet());
+		return new ArrayList(siegeNameMap.keySet());
+	}
+	
+	public static List<String> listActiveSiegeNames()
+	{
+		List<String> list = new ArrayList();
+		for (Siege siege : siegeMap.values())
+		{
+			if (siege.isActive())
+			{
+				list.add(siege.getSiegeName());
+			}
+		}
+		return list;
 	}
 	
 	public static boolean validSiegeName(String name)
@@ -36,43 +55,50 @@ public class SiegeDatabase
 		return StringUtils.isAlphanumeric(name.replaceAll("_", ""));
 	}
 	
-	public static void putAndSaveSiege(Siege siege)
+	public static boolean validTeamName(String name)
 	{
-		siegeMap.put(siege.getSiegeName(), siege);
+		return StringUtils.isAlphanumeric(name.replaceAll("_", ""));
+	}
+	
+	public static void addAndSaveSiege(Siege siege)
+	{
+		siegeMap.put(siege.getSiegeID(), siege);
+		putSiegeNameAndID(siege);
 		saveSiegeToFile(siege);
 	}
 	
-	public static void updateAllSieges(World world)
+	private static void putSiegeNameAndID(Siege siege)
+	{
+		siegeNameMap.put(siege.getSiegeName(), siege.getSiegeID());
+	}
+	
+	public static void renameSiege(Siege siege, String oldName)
+	{
+		siegeNameMap.remove(oldName);
+		putSiegeNameAndID(siege);
+	}
+	
+	public static void updateActiveSieges(World world)
 	{
 		for (Siege siege : siegeMap.values())
 		{
-			if (siege.isSiegeWorld(world))
+			if (siege.isActive() && siege.isSiegeWorld(world))
 			{
 				siege.updateSiege(world);
 			}
 		}
 	}
 	
-	public static Siege getSiegeForPlayer(EntityPlayer entityplayer)
+	public static Siege getActiveSiegeForPlayer(EntityPlayer entityplayer)
 	{
 		for (Siege siege : siegeMap.values())
 		{
-			if (siege.hasPlayer(entityplayer))
+			if (siege.isActive() && siege.hasPlayer(entityplayer))
 			{
 				return siege;
 			}
 		}
 		return null;
-	}
-	
-	public static void updatePlayerInSiege(EntityPlayer entityplayer)
-	{
-		World world = entityplayer.worldObj;
-		Siege siege = getSiegeForPlayer(entityplayer);
-		if (siege != null && siege.isSiegeWorld(world))
-		{
-			siege.updatePlayer(entityplayer);
-		}
 	}
 	
 	private static File getOrCreateSiegeDirectory()
@@ -87,13 +113,8 @@ public class SiegeDatabase
 	
 	private static File getSiegeFile(Siege siege)
 	{
-		return getSiegeFile(siege.getSiegeName());
-	}
-	
-	private static File getSiegeFile(String siegeName)
-	{
 		File siegeDir = getOrCreateSiegeDirectory();
-		return new File(siegeDir, siegeName + ".dat");
+		return new File(siegeDir, siege.getSiegeID().toString() + ".dat");
 	}
 	
 	public static boolean anyNeedSave()
@@ -118,6 +139,7 @@ public class SiegeDatabase
 				if (siege.needsSave())
 				{
 					saveSiegeToFile(siege);
+					siege.markSaved();
 					i++;
 				}
 			}
@@ -133,6 +155,7 @@ public class SiegeDatabase
 	public static void reloadAll()
 	{
 		siegeMap.clear();
+		siegeNameMap.clear();
 		try
 		{
 			File siegeDir = getOrCreateSiegeDirectory();
@@ -141,7 +164,8 @@ public class SiegeDatabase
 			for (File dat : siegeFiles)
 			{
 				Siege siege = loadSiegeFromFile(dat);
-				siegeMap.put(siege.getSiegeName(), siege);
+				siegeMap.put(siege.getSiegeID(), siege);
+				putSiegeNameAndID(siege);
 				i++;
 			}
 			FMLLog.info("SiegeMode: Loaded %d sieges", i);
@@ -158,7 +182,7 @@ public class SiegeDatabase
 		try
 		{
 			NBTTagCompound nbt = SiegeMode.loadNBTFromFile(siegeFile);
-			Siege siege = new Siege();
+			Siege siege = new Siege("");
 			siege.readFromNBT(nbt);
 			return siege;
 		}

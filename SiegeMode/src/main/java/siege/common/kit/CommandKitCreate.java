@@ -60,7 +60,7 @@ public class CommandKitCreate extends CommandBase
 				else
 				{
 					Kit kit = Kit.createFrom(entityplayer, kitName);
-					KitDatabase.putAndSaveKit(kit);
+					KitDatabase.addAndSaveKit(kit);
 					func_152373_a(sender, this, "Created a new kit %s from the inventory of %s", kitName, entityplayer.getCommandSenderName());
 					return;
 				}

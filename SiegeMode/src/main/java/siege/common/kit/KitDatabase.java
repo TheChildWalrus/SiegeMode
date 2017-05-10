@@ -34,7 +34,7 @@ public class KitDatabase
 		return StringUtils.isAlphanumeric(name.replaceAll("_", ""));
 	}
 	
-	public static void putAndSaveKit(Kit kit)
+	public static void addAndSaveKit(Kit kit)
 	{
 		kitMap.put(kit.getKitName(), kit);
 		saveKitToFile(kit);

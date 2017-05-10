@@ -4,8 +4,10 @@ import java.util.*;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.*;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraftforge.common.util.Constants;
+import siege.common.kit.KitDatabase;
 
 public class SiegeTeam
 {
@@ -23,14 +25,83 @@ public class SiegeTeam
 		theSiege = siege;
 	}
 	
+	public SiegeTeam(Siege siege, String s)
+	{
+		this(siege);
+		teamName = s;
+	}
+	
+	public void remove()
+	{
+		theSiege = null;
+	}
+	
+	public String getTeamName()
+	{
+		return teamName;
+	}
+	
+	public void rename(String s)
+	{
+		teamName = s;
+		theSiege.markDirty();
+	}
+	
 	public boolean containsPlayer(EntityPlayer entityplayer)
 	{
 		return teamPlayers.contains(entityplayer.getUniqueID());
 	}
 	
-	public ChunkCoordinates getRespawnPoint()
+	public int playerCount()
 	{
-		return new ChunkCoordinates(respawnX, respawnY, respawnZ);
+		int i = 0;
+		List playerList = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
+		for (Object player : playerList)
+		{
+			EntityPlayer entityplayer = (EntityPlayer)player;
+			if (containsPlayer(entityplayer))
+			{
+				i++;
+			}
+		}
+		return i;
+	}
+	
+	public boolean canPlayerJoin(EntityPlayer entityplayer)
+	{
+		if (containsPlayer(entityplayer))
+		{
+			return false;
+		}
+		
+		int count = playerCount();
+		int lowestCount = theSiege.getSmallestTeamSize();
+		if (count - lowestCount > theSiege.getMaxTeamDifference())
+		{
+			return false;
+		}
+		
+		return true;
+	}
+	
+	public void joinPlayer(EntityPlayer entityplayer)
+	{
+		if (!containsPlayer(entityplayer))
+		{
+			UUID playerID = entityplayer.getUniqueID();
+			teamPlayers.add(playerID);
+			theSiege.markDirty();
+		}
+	}
+	
+	public void leavePlayer(EntityPlayer entityplayer)
+	{
+		if (containsPlayer(entityplayer))
+		{
+			UUID playerID = entityplayer.getUniqueID();
+			teamPlayers.remove(playerID);
+			theSiege.markDirty();
+		}
 	}
 	
 	public String getRandomKitName(Random random)
@@ -40,6 +111,48 @@ public class SiegeTeam
 			return null;
 		}
 		return teamKits.get(random.nextInt(teamKits.size()));
+	}
+	
+	public boolean containsKit(String kitName)
+	{
+		return teamKits.contains(kitName);
+	}
+	
+	public void addKit(String kitName)
+	{
+		teamKits.add(kitName);
+		theSiege.markDirty();
+	}
+	
+	public void removeKit(String kitName)
+	{
+		teamKits.remove(kitName);
+		theSiege.markDirty();
+	}
+	
+	public List<String> listKitNames()
+	{
+		return new ArrayList(teamKits);
+	}
+	
+	public List<String> listUnincludedKitNames()
+	{
+		List<String> names = KitDatabase.getAllKitNames();
+		names.removeAll(teamKits);
+		return names;
+	}
+	
+	public ChunkCoordinates getRespawnPoint()
+	{
+		return new ChunkCoordinates(respawnX, respawnY, respawnZ);
+	}
+	
+	public void setRespawnPoint(int i, int j, int k)
+	{
+		respawnX = i;
+		respawnY = j;
+		respawnZ = k;
+		theSiege.markDirty();
 	}
 	
 	public void writeToNBT(NBTTagCompound nbt)

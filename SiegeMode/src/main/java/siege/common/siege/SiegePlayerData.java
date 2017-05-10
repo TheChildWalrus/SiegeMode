@@ -9,6 +9,7 @@ public class SiegePlayerData
 	
 	private BackupSpawnPoint backupSpawnPoint;
 	private String chosenKit;
+	private String nextTeam;
 
 	public SiegePlayerData(Siege siege)
 	{
@@ -31,6 +32,11 @@ public class SiegePlayerData
 		{
 			nbt.setString("Kit", chosenKit);
 		}
+		
+		if (nextTeam != null)
+		{
+			nbt.setString("NextTeam", nextTeam);
+		}
 	}
 	
 	public void readFromNBT(NBTTagCompound nbt)
@@ -48,6 +54,7 @@ public class SiegePlayerData
 		}
 		
 		chosenKit = nbt.getString("Kit");
+		nextTeam = nbt.getString("NextTeam");
 	}
 	
 	public BackupSpawnPoint getBackupSpawnPoint()
@@ -68,7 +75,18 @@ public class SiegePlayerData
 
 	public void setChosenKit(String kit)
 	{
-		kit = chosenKit;
+		chosenKit = kit;
+		theSiege.markDirty();
+	}
+	
+	public String getNextTeam()
+	{
+		return nextTeam;
+	}
+
+	public void setNextTeam(String team)
+	{
+		nextTeam = team;
 		theSiege.markDirty();
 	}
 }
