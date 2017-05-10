@@ -69,14 +69,16 @@ public class CommandSiegePlay extends CommandBase
 									}
 								}
 								
-								siege.joinPlayer(operator, team, kitName);
-								if (kitName == null)
+								if (siege.joinPlayer(operator, team, kitName))
 								{
-									func_152373_a(sender, this, "Joined siege %s on team %s", siegeName, teamName);
-								}
-								else
-								{
-									func_152373_a(sender, this, "Joined siege %s on team %s as kit %s", siegeName, teamName, kitName);
+									if (kitName == null)
+									{
+										func_152373_a(sender, this, "Joined siege %s on team %s", siegeName, teamName);
+									}
+									else
+									{
+										func_152373_a(sender, this, "Joined siege %s on team %s as kit %s", siegeName, teamName, kitName);
+									}
 								}
 								return;
 							}

@@ -7,6 +7,8 @@ public class SiegePlayerData
 {
 	private Siege theSiege;
 	
+	private boolean warnedClearInv = false;
+	
 	private BackupSpawnPoint backupSpawnPoint;
 	private String chosenKit;
 	private String nextTeam;
@@ -18,6 +20,8 @@ public class SiegePlayerData
 	
 	public void writeToNBT(NBTTagCompound nbt)
 	{
+		nbt.setBoolean("WarnedClearInv", warnedClearInv);
+		
 		if (backupSpawnPoint != null)
 		{
 			nbt.setInteger("BSP_Dim", backupSpawnPoint.dimension);
@@ -41,6 +45,8 @@ public class SiegePlayerData
 	
 	public void readFromNBT(NBTTagCompound nbt)
 	{
+		warnedClearInv = nbt.getBoolean("WarnedClearInv");
+		
 		backupSpawnPoint = null;
 		if (nbt.hasKey("BSP_Dim"))
 		{
@@ -55,6 +61,17 @@ public class SiegePlayerData
 		
 		chosenKit = nbt.getString("Kit");
 		nextTeam = nbt.getString("NextTeam");
+	}
+	
+	public boolean getWarnedClearInv()
+	{
+		return warnedClearInv;
+	}
+	
+	public void setWarnedClearInv(boolean flag)
+	{
+		warnedClearInv = flag;
+		theSiege.markDirty();
 	}
 	
 	public BackupSpawnPoint getBackupSpawnPoint()

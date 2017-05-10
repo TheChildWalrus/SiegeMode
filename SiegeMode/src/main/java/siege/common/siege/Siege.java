@@ -27,7 +27,7 @@ public class Siege
 	private int radius;
 	public static final int MAX_RADIUS = 2000;
 	private int ticksRemaining = 0;
-	private static final double EDGE_PUT_RANGE = 5D;
+	private static final double EDGE_PUT_RANGE = 2D;
 	
 	private List<SiegeTeam> siegeTeams = new ArrayList();
 	private int maxTeamDifference = 8;
@@ -263,30 +263,46 @@ public class Siege
 		}
 	}
 	
-	public void joinPlayer(EntityPlayer entityplayer, SiegeTeam team, String kitName)
+	public boolean joinPlayer(EntityPlayer entityplayer, SiegeTeam team, String kitName)
 	{
-		team.joinPlayer(entityplayer);
-		
-		ChunkCoordinates teamSpawn = team.getRespawnPoint();
-		entityplayer.setPositionAndUpdate(teamSpawn.posX + 0.5D, teamSpawn.posY, teamSpawn.posZ + 0.5D);
-		
-		if (kitName != null)
+		SiegePlayerData playerData = getPlayerData(entityplayer);
+		if (!playerData.getWarnedClearInv())
 		{
-			getPlayerData(entityplayer).setChosenKit(kitName);
+			messagePlayer(entityplayer, "WARNING! Joining a siege will clear all items from your inventory!");
+			messagePlayer(entityplayer, "You will not be warned again!");
+			playerData.setWarnedClearInv(true);
+			return false;
 		}
-		
-		applyPlayerKit(entityplayer);
+		else
+		{
+			team.joinPlayer(entityplayer);
+			
+			ChunkCoordinates teamSpawn = team.getRespawnPoint();
+			entityplayer.setPositionAndUpdate(teamSpawn.posX + 0.5D, teamSpawn.posY, teamSpawn.posZ + 0.5D);
+			
+			if (kitName != null)
+			{
+				getPlayerData(entityplayer).setChosenKit(kitName);
+			}
+			applyPlayerKit(entityplayer);
+			
+			return true;
+		}
 	}
 	
 	public void leavePlayer(EntityPlayer entityplayer)
 	{
 		SiegeTeam team = getPlayerTeam(entityplayer);
 		team.leavePlayer(entityplayer);
+		
 		restoreAndClearBackupSpawnPoint(entityplayer);
 		entityplayer.inventory.clearInventory(null, -1);
+		
+		UUID playerID = entityplayer.getUniqueID();
+		playerDataMap.remove(playerID);
 	}
 	
-	private void messagePlayer(EntityPlayer entityplayer, String text)
+	public void messagePlayer(EntityPlayer entityplayer, String text)
 	{
 		IChatComponent message = new ChatComponentText(text);
 		message.getChatStyle().setColor(EnumChatFormatting.RED);
