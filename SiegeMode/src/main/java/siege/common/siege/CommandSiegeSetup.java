@@ -323,7 +323,7 @@ public class CommandSiegeSetup extends CommandBase
 		                	throw new CommandException("Player %s is not taking part in siege %s", playerName, siegeName);
 		                }
 		                
-						siege.leavePlayer(entityplayer);
+						siege.leavePlayer(entityplayer, true);
 						func_152373_a(sender, this, "Removed player %s from siege %s", playerName, siegeName);
 						return;
 					}

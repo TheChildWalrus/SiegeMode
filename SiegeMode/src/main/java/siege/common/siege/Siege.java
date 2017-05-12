@@ -9,9 +9,6 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.network.Packet;
-import net.minecraft.network.play.server.*;
-import net.minecraft.scoreboard.*;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.*;
 import net.minecraft.world.World;
@@ -47,8 +44,6 @@ public class Siege
 	
 	private Map<UUID, SiegePlayerData> playerDataMap = new HashMap();
 	private static final int KILLSTREAK_ANNOUNCE = 3;
-	
-	private Set<String> sentScoreboards = new HashSet();
 	
 	public Siege(String s)
 	{
@@ -375,7 +370,7 @@ public class Siege
 			EntityPlayerMP entityplayer = (EntityPlayerMP)player;
 			if (hasPlayer(entityplayer))
 			{
-				leavePlayer(entityplayer);
+				leavePlayer(entityplayer, false);
 			}
 		}
 		
@@ -383,8 +378,6 @@ public class Siege
 		{
 			team.onSiegeEnd();
 		}
-		
-		sentScoreboards.clear();
 		
 		markDirty();
 	}
@@ -417,16 +410,6 @@ public class Siege
 					boolean inSiege = hasPlayer(entityplayer);
 					updatePlayer(entityplayer, inSiege);
 				}
-				
-				Set<String> removeSent = new HashSet();
-				for (String playerName : sentScoreboards)
-				{
-					if (MinecraftServer.getServer().getConfigurationManager().func_152612_a(playerName) == null)
-					{
-						removeSent.add(playerName);
-					}
-				}
-				sentScoreboards.removeAll(removeSent);
 				
 				if (ticksRemaining % SCORE_INTERVAL == 0)
 				{
@@ -490,10 +473,10 @@ public class Siege
 		}
 	}
 	
-	public void leavePlayer(EntityPlayerMP entityplayer)
+	public void leavePlayer(EntityPlayerMP entityplayer, boolean forceClearScores)
 	{
 		// TODO: implement a timer or something; for now scores stay until they relog, better than immediately disappearing
-		updateSiegeScoreboards(entityplayer);
+		getPlayerData(entityplayer).updateSiegeScoreboard(entityplayer, forceClearScores);
 		
 		SiegeTeam team = getPlayerTeam(entityplayer);
 		team.leavePlayer(entityplayer);
@@ -568,99 +551,7 @@ public class Siege
 			}
 		}
 		
-		updateSiegeScoreboards(entityplayer);
-	}
-	
-	private void updateSiegeScoreboards(EntityPlayerMP entityplayer)
-	{
-		World world = entityplayer.worldObj;
-		SiegePlayerData playerData = getPlayerData(entityplayer);
-		SiegeTeam team = getPlayerTeam(entityplayer);
-		
-		Scoreboard scoreboard = world.getScoreboard();
-		ScoreObjective siegeObj = new ScoreObjective(scoreboard, "SiegeMode", null);
-		String displayName = "SiegeMode: " + getSiegeName();
-		siegeObj.setDisplayName(displayName);
-		
-		// TODO: change this to account for when the siege ends: remove scoreboards / start a timer etc.
-		boolean inSiege = team != null;
-		if (inSiege)
-		{
-			String kitName = "";
-			Kit currentKit = KitDatabase.getKit(playerData.getCurrentKit());
-			if (currentKit != null)
-			{
-				kitName = currentKit.getKitName();
-			}
-			
-			String timeRemaining = isActive() ? ("Remaining: " + ticksToTimeString(ticksRemaining)) : "Ended";
-			
-			// clever trick to control the ordering of the objectives: put actual scores in the 'playernames', and put the desired order in the 'scores'!
-			
-			List<Score> allSiegeStats = new ArrayList();
-			allSiegeStats.add(new Score(scoreboard, siegeObj, timeRemaining));
-			allSiegeStats.add(null);
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Team: " + team.getTeamName()));
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Kit: " + kitName));
-			allSiegeStats.add(null);
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Kills: " + playerData.getKills()));
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Deaths: " + playerData.getDeaths()));
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Killstreak: " + playerData.getKillstreak()));
-			allSiegeStats.add(null);
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Team Kills: " + team.getTeamKills()));
-			allSiegeStats.add(new Score(scoreboard, siegeObj, "Team Deaths: " + team.getTeamDeaths()));
-			
-			if (!sentScoreboards.contains(entityplayer.getCommandSenderName()))
-			{
-				sentScoreboards.add(entityplayer.getCommandSenderName());
-			}
-			else
-			{
-				// if already sent, remove the old siege objective first!
-				Packet pktRemove = new S3BPacketScoreboardObjective(siegeObj, 1);
-				entityplayer.playerNetServerHandler.sendPacket(pktRemove);
-			}
-			
-			// recreate the siege objective (or create for first time if not sent before)
-			Packet pktAdd = new S3BPacketScoreboardObjective(siegeObj, 0);
-			entityplayer.playerNetServerHandler.sendPacket(pktAdd);
-			
-			Packet pktDisplay = new S3DPacketDisplayScoreboard(1, siegeObj);
-			entityplayer.playerNetServerHandler.sendPacket(pktDisplay);
-			
-			int index = allSiegeStats.size();
-			int gaps = 0;
-			for (Score score : allSiegeStats)
-			{
-				if (score == null)
-				{
-					// create a unique gap string, based on how many gaps we've already had
-					String gapString = "";
-					for (int l = 0; l <= gaps; l++)
-					{
-						gapString += "-";
-					}
-					score = new Score(scoreboard, siegeObj, gapString);
-					gaps++;
-				}
-				
-				score.setScorePoints(index);
-				Packet pktScore = new S3CPacketUpdateScore(score, 0);
-				entityplayer.playerNetServerHandler.sendPacket(pktScore);
-				index--;
-			}
-		}
-		else
-		{
-			// TODO: this happens when you leave, but not when the siege ends.
-			// change when the timer is implemented
-			if (sentScoreboards.contains(entityplayer.getCommandSenderName()))
-			{
-				Packet pkt = new S3BPacketScoreboardObjective(siegeObj, 1);
-				entityplayer.playerNetServerHandler.sendPacket(pkt);
-				sentScoreboards.remove(entityplayer.getCommandSenderName());
-			}
-		}
+		playerData.updateSiegeScoreboard(entityplayer, false);
 	}
 	
 	public void onPlayerDeath(EntityPlayer entityplayer, DamageSource source)
