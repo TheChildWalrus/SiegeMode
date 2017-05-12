@@ -6,6 +6,7 @@ import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.DamageSource;
@@ -19,6 +20,7 @@ import siege.common.kit.KitDatabase;
 import siege.common.siege.*;
 import cpw.mods.fml.common.eventhandler.Event.Result;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent;
 import cpw.mods.fml.common.gameevent.*;
 import cpw.mods.fml.common.gameevent.TickEvent.Phase;
@@ -61,7 +63,7 @@ public class EventHandler
 			}
 		}
 	}
-	
+
 	@SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event)
 	{
@@ -82,6 +84,22 @@ public class EventHandler
 					SiegeMode.clearPlayerInv(entityplayer);
 				}
 				Siege.setHasSiegeGivenKit(entityplayer, false);
+			}
+		}
+	}
+	
+	@SubscribeEvent
+    public void onPlayerLoggedIn(PlayerLoggedOutEvent event)
+	{
+		EntityPlayer entityplayer = event.player;
+		World world = entityplayer.worldObj;
+		
+		if (!world.isRemote)
+		{
+			Siege activeSiege = SiegeDatabase.getActiveSiegeForPlayer(entityplayer);
+			if (activeSiege != null)
+			{
+				activeSiege.onPlayerLogout((EntityPlayerMP)entityplayer);
 			}
 		}
 	}

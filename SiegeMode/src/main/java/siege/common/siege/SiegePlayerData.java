@@ -186,6 +186,11 @@ public class SiegePlayerData
 		return killstreak;
 	}
 	
+	public void onLogout(EntityPlayerMP entityplayer)
+	{
+		lastSentSiegeObjective = null;
+	}
+	
 	public void updateSiegeScoreboard(EntityPlayerMP entityplayer, boolean forceClear)
 	{
 		World world = entityplayer.worldObj;

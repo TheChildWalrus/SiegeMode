@@ -684,6 +684,15 @@ public class Siege
 		entityplayer.getEntityData().setBoolean("HasSiegeKit", flag);
 	}
 	
+	public void onPlayerLogout(EntityPlayerMP entityplayer)
+	{
+		SiegePlayerData playerData = getPlayerData(entityplayer);
+		if (playerData != null)
+		{
+			playerData.onLogout(entityplayer);
+		}
+	}
+	
 	public void markDirty()
 	{
 		needsSave = true;
