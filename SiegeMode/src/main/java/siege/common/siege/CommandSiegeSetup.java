@@ -3,9 +3,9 @@ package siege.common.siege;
 import java.util.List;
 
 import net.minecraft.command.*;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.MathHelper;
+import siege.common.kit.Kit;
 import siege.common.kit.KitDatabase;
 
 public class CommandSiegeSetup extends CommandBase
@@ -25,7 +25,7 @@ public class CommandSiegeSetup extends CommandBase
 	@Override
     public String getCommandUsage(ICommandSender sender)
     {
-        return "/siege_setup <...> (use TAB key to autocomplete suggestions)";
+        return "/siege_setup <...> (use TAB key to autocomplete parameters)";
     }
 	
 	@Override
@@ -134,30 +134,42 @@ public class CommandSiegeSetup extends CommandBase
 								else if (teamFunction.equals("kit-add"))
 								{
 									String kitName = args[6];
-									if (team.containsKit(kitName))
+									if (!KitDatabase.kitExists(kitName))
 									{
-										throw new CommandException("Siege %s team %s already includes kit %s!", siegeName, teamName, kitName);
+										throw new CommandException("Kit %s does not exist", kitName);
 									}
-									else if (!KitDatabase.kitExists(kitName))
+									else
 									{
-										throw new CommandException("Kit %s does not exist");
+										Kit kit = KitDatabase.getKit(kitName);
+										if (team.containsKit(kit))
+										{
+											throw new CommandException("Siege %s team %s already includes kit %s!", siegeName, teamName, kitName);
+										}
+										
+										team.addKit(kit);
+										func_152373_a(sender, this, "Added kit %s for team %s in siege %s", kitName, teamName, siegeName);
+										return;
 									}
-									
-									team.addKit(kitName);
-									func_152373_a(sender, this, "Added kit %s for team %s in siege %s", kitName, teamName, siegeName);
-									return;
 								}
 								else if (teamFunction.equals("kit-remove"))
 								{
 									String kitName = args[6];
-									if (!team.containsKit(kitName))
+									if (!KitDatabase.kitExists(kitName))
 									{
-										throw new CommandException("Siege %s team %s does not include kit %s!", siegeName, teamName, kitName);
+										throw new CommandException("Kit %s does not exist", kitName);
 									}
-									
-									team.removeKit(kitName);
-									func_152373_a(sender, this, "Removed kit %s from team %s in siege %s", kitName, teamName, siegeName);
-									return;
+									else
+									{
+										Kit kit = KitDatabase.getKit(kitName);
+										if (!team.containsKit(kit))
+										{
+											throw new CommandException("Siege %s team %s does not include kit %s!", siegeName, teamName, kitName);
+										}
+										
+										team.removeKit(kit);
+										func_152373_a(sender, this, "Removed kit %s from team %s in siege %s", kitName, teamName, siegeName);
+										return;
+									}
 								}
 								else if (teamFunction.equals("setspawn"))
 								{
@@ -196,65 +208,104 @@ public class CommandSiegeSetup extends CommandBase
 						func_152373_a(sender, this, "Set siege %s max team difference to %s", siegeName, String.valueOf(maxDiff));
 						return;
 					}
-					else if (sFunction.equals("start"))
+					else if (sFunction.equals("friendly-fire"))
 					{
-						if (siege.isActive())
+						String ffOption = args[3];
+						if (ffOption.equals("on"))
 						{
-							throw new CommandException("Siege %s is already active!", siegeName);
-						}
-						else if (!siege.canBeStarted())
-						{
-							throw new CommandException("Siege %s cannot be started - it requires a location and at least one team", siegeName);
-						}
-						
-						if (args.length >= 4)
-						{
-							int seconds = parseIntWithMin(sender, args[3], 0);
-							int durationTicks = seconds * 20;
-							siege.startSiege(durationTicks);
-							
-					        int minutes = seconds / 60;
-					        seconds %= 60;
-					        String timeDisplay = minutes + "m" + " " + seconds + "s";
-							func_152373_a(sender, this, "Started a new siege %s lasting for %s", siegeName, timeDisplay);
+							siege.setFriendlyFire(true);
+							func_152373_a(sender, this, "Enabled friendly fire in siege %s", siegeName);
 							return;
 						}
-						else
+						else if (ffOption.equals("off"))
 						{
-							throw new CommandException("Specify the siege duration (in seconds)");
+							siege.setFriendlyFire(false);
+							func_152373_a(sender, this, "Disabled friendly fire in siege %s", siegeName);
+							return;
 						}
 					}
-					else if (sFunction.equals("extend"))
+					else if (sFunction.equals("mob-spawning"))
 					{
-						if (!siege.isActive())
+						String mobOption = args[3];
+						if (mobOption.equals("on"))
 						{
-							throw new CommandException("Siege %s is not active!", siegeName);
+							siege.setMobSpawning(true);
+							func_152373_a(sender, this, "Enabled mob spawning in siege %s", siegeName);
+							return;
 						}
+						else if (mobOption.equals("off"))
+						{
+							siege.setMobSpawning(false);
+							func_152373_a(sender, this, "Disabled mob spawning in siege %s", siegeName);
+							return;
+						}
+					}
+				}
+				else
+				{
+					throw new CommandException("No siege for name %s", siegeName);
+				}
+			}
+			else if (option.equals("start"))
+			{
+				String siegeName = args[1];
+				Siege siege = SiegeDatabase.getSiege(siegeName);
+				if (siege != null)
+				{
+					if (siege.isActive())
+					{
+						throw new CommandException("Siege %s is already active!", siegeName);
+					}
+					else if (!siege.canBeStarted())
+					{
+						throw new CommandException("Siege %s cannot be started - it requires a location and at least one team", siegeName);
+					}
+					
+					if (args.length >= 3)
+					{
+						int seconds = parseIntWithMin(sender, args[2], 0);
+						int durationTicks = seconds * 20;
+						siege.startSiege(durationTicks);
 						
+				        String timeDisplay = Siege.ticksToTimeString(durationTicks);
+						func_152373_a(sender, this, "Started a new siege %s lasting for %s", siegeName, timeDisplay);
+						return;
+					}
+					else
+					{
+						throw new CommandException("Specify the siege duration (in seconds)");
+					}
+
+				}
+				else
+				{
+					throw new CommandException("No siege for name %s", siegeName);
+				}
+			}
+			else if (option.equals("active"))
+			{
+				String siegeName = args[1];
+				Siege siege = SiegeDatabase.getSiege(siegeName);
+				if (siege != null && siege.isActive())
+				{
+					String sFunction = args[2];
+					
+					if (sFunction.equals("extend"))
+					{
 						int seconds = parseIntWithMin(sender, args[3], 0);
 						int durationTicks = seconds * 20;
 						siege.extendSiege(durationTicks);
 						
-				        int minutes = seconds / 60;
-				        seconds %= 60;
-				        String timeDisplay = minutes + "m" + " " + seconds + "s";
+						String timeDisplay = Siege.ticksToTimeString(durationTicks);
 				        
 				        int fullDuration = siege.getTicksRemaining();
-				        int fullSeconds = fullDuration / 20;
-				        int fullMinutes = fullSeconds / 60;
-				        fullSeconds %= 60;
-				        String fullTimeDisplay = fullMinutes + "m" + " " + fullSeconds + "s";
+				        String fullTimeDisplay = Siege.ticksToTimeString(fullDuration);
 				        
 						func_152373_a(sender, this, "Extended siege %s for %s - now lasting for %s", siegeName, timeDisplay, fullTimeDisplay);
 						return;
 					}
 					else if (sFunction.equals("end"))
 					{
-						if (!siege.isActive())
-						{
-							throw new CommandException("Siege %s is not active!", siegeName);
-						}
-						
 						siege.endSiege();
 						func_152373_a(sender, this, "Ended siege %s", siegeName);
 						return;
@@ -262,7 +313,7 @@ public class CommandSiegeSetup extends CommandBase
 					else if (sFunction.equals("kick"))
 					{
 						String playerName = args[3];
-						EntityPlayer entityplayer = getPlayer(sender, playerName);
+						EntityPlayerMP entityplayer = getPlayer(sender, playerName);
 		                if (entityplayer == null)
 		                {
 		                    throw new PlayerNotFoundException();
@@ -279,6 +330,22 @@ public class CommandSiegeSetup extends CommandBase
 				}
 				else
 				{
+					throw new CommandException("No active siege for name %s", siegeName);
+				}
+			}
+			else if (option.equals("delete"))
+			{
+				String siegeName = args[1];
+				Siege siege = SiegeDatabase.getSiege(siegeName);
+				if (siege != null)
+				{
+					SiegeDatabase.deleteSiege(siege);
+					func_152373_a(sender, this, "Deleted siege %s", siegeName);
+					return;
+
+				}
+				else
+				{
 					throw new CommandException("No siege for name %s", siegeName);
 				}
 			}
@@ -292,71 +359,108 @@ public class CommandSiegeSetup extends CommandBase
     {
         if (args.length == 1)
         {
-        	return getListOfStringsMatchingLastWord(args, "new", "edit");
+        	return getListOfStringsMatchingLastWord(args, "new", "edit", "start", "active", "delete");
         }
-        if (args.length >= 2 && args[0].equals("edit"))
+        if (args.length >= 2)
         {
-        	if (args.length == 2)
-	        {
-	        	return getListOfStringsMatchingLastWord(args, SiegeDatabase.getAllSiegeNames().toArray(new String[0]));
-	        }
-	        if (args.length == 3)
-	        {
-	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "start", "extend", "end", "kick");
-	        }
-	        if (args.length >= 4)
-	        {
-	        	String siegeName = args[1];
-	        	Siege siege = SiegeDatabase.getSiege(siegeName);
-	        	String sFunction = args[2];
-	        	if (sFunction.equals("teams"))
-	        	{
-	        		if (args.length == 4)
-	        		{
-	        			return getListOfStringsMatchingLastWord(args, "new", "edit", "remove");
-	        		}
-	        		if (args.length >= 5)
-	        		{
-	        			String teamOption = args[3];
-	        			if (teamOption.equals("edit"))
-	        			{
-	            			if (args.length == 5)
-	            			{
-	            				return getListOfStringsMatchingLastWord(args, siege.listTeamNames().toArray(new String[0]));
-	            			}
-	        				if (args.length >= 6)
-	        				{
-	        					String teamName = args[4];
-	        					SiegeTeam team = siege.getTeam(teamName);
-	        					if (args.length == 6)
-	        					{
-	        						return getListOfStringsMatchingLastWord(args, "rename", "kit-add", "kit-remove", "setspawn");
-	        					}
-	        					if (args.length >= 7)
-	        					{
-	        						String teamFunction = args[5];
-	            					if (teamFunction.equals("kit-add"))
-	            					{
-	            						return getListOfStringsMatchingLastWord(args, team.listUnincludedKitNames().toArray(new String[0]));
-	            					}
-	            					if (teamFunction.equals("kit-remove"))
-	            					{
-	            						return getListOfStringsMatchingLastWord(args, team.listKitNames().toArray(new String[0]));
-	            					}
-	        					}
-	        				}
-	        			}
-	        			if (teamOption.equals("remove"))
-	        			{
-	        				return getListOfStringsMatchingLastWord(args, siege.listTeamNames().toArray(new String[0]));
-	        			}
-	        		}
-	        	}
-	        	else if (sFunction.equals("kick"))
-	        	{
-	        		return getListOfStringsMatchingLastWord(args, siege.listAllPlayerNames().toArray(new String[0]));
-	        	}
-	        }
+        	String sOption = args[0];
+        	if (sOption.equals("edit"))
+        	{
+        		if (args.length == 2)
+    	        {
+    	        	return getListOfStringsMatchingLastWord(args, SiegeDatabase.getAllSiegeNames().toArray(new String[0]));
+    	        }
+    	        if (args.length == 3)
+    	        {
+    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "friendly-fire", "mob-spawning");
+    	        }
+    	        if (args.length >= 4)
+    	        {
+    	        	String siegeName = args[1];
+    	        	Siege siege = SiegeDatabase.getSiege(siegeName);
+    	        	String sFunction = args[2];
+    	        	if (sFunction.equals("teams"))
+    	        	{
+    	        		if (args.length == 4)
+    	        		{
+    	        			return getListOfStringsMatchingLastWord(args, "new", "edit", "remove");
+    	        		}
+    	        		if (args.length >= 5)
+    	        		{
+    	        			String teamOption = args[3];
+    	        			if (teamOption.equals("edit"))
+    	        			{
+    	            			if (args.length == 5)
+    	            			{
+    	            				return getListOfStringsMatchingLastWord(args, siege.listTeamNames().toArray(new String[0]));
+    	            			}
+    	        				if (args.length >= 6)
+    	        				{
+    	        					String teamName = args[4];
+    	        					SiegeTeam team = siege.getTeam(teamName);
+    	        					if (args.length == 6)
+    	        					{
+    	        						return getListOfStringsMatchingLastWord(args, "rename", "kit-add", "kit-remove", "setspawn");
+    	        					}
+    	        					if (args.length >= 7)
+    	        					{
+    	        						String teamFunction = args[5];
+    	            					if (teamFunction.equals("kit-add"))
+    	            					{
+    	            						return getListOfStringsMatchingLastWord(args, team.listUnincludedKitNames().toArray(new String[0]));
+    	            					}
+    	            					if (teamFunction.equals("kit-remove"))
+    	            					{
+    	            						return getListOfStringsMatchingLastWord(args, team.listKitNames().toArray(new String[0]));
+    	            					}
+    	        					}
+    	        				}
+    	        			}
+    	        			if (teamOption.equals("remove"))
+    	        			{
+    	        				return getListOfStringsMatchingLastWord(args, siege.listTeamNames().toArray(new String[0]));
+    	        			}
+    	        		}
+    	        	}
+    	        	else if (sFunction.equals("friendly-fire"))
+    	        	{
+    	        		return getListOfStringsMatchingLastWord(args, "on", "off");
+    	        	}
+    	        	else if (sFunction.equals("mob-spawning"))
+    	        	{
+    	        		return getListOfStringsMatchingLastWord(args, "on", "off");
+    	        	}
+    	        }
+        	}
+        	else if (sOption.equals("start"))
+        	{
+        		return getListOfStringsMatchingLastWord(args, SiegeDatabase.listInactiveSiegeNames().toArray(new String[0]));
+        	}
+        	else if (sOption.equals("active"))
+        	{
+        		if (args.length == 2)
+    	        {
+    	        	return getListOfStringsMatchingLastWord(args, SiegeDatabase.listActiveSiegeNames().toArray(new String[0]));
+    	        }
+    	        if (args.length == 3)
+    	        {
+    	        	return getListOfStringsMatchingLastWord(args, "extend", "end", "kick");
+    	        }
+    	        if (args.length >= 4)
+    	        {
+    	        	String siegeName = args[1];
+    	        	Siege siege = SiegeDatabase.getSiege(siegeName);
+    	        	String sFunction = args[2];
+    	        	if (sFunction.equals("kick"))
+    	        	{
+    	        		return getListOfStringsMatchingLastWord(args, siege.listAllPlayerNames().toArray(new String[0]));
+    	        	}
+    	        }
+        	}
+        	else if (sOption.equals("delete"))
+        	{
+        		return getListOfStringsMatchingLastWord(args, SiegeDatabase.getAllSiegeNames().toArray(new String[0]));
+        	}
         }
         return null;
     }

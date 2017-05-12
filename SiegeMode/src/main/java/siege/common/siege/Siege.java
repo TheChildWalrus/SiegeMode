@@ -3,19 +3,29 @@ package siege.common.siege;
 import java.util.*;
 import java.util.Map.Entry;
 
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.server.*;
+import net.minecraft.scoreboard.*;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.*;
 import net.minecraft.world.World;
+import net.minecraftforge.common.UsernameCache;
 import net.minecraftforge.common.util.Constants;
+import siege.common.SiegeMode;
 import siege.common.kit.Kit;
 import siege.common.kit.KitDatabase;
+import cpw.mods.fml.common.event.FMLInterModComms;
 
 public class Siege
 {
 	private boolean needsSave = false;
+	private boolean deleted = false;
 	
 	private UUID siegeID;
 	private String siegeName;
@@ -27,12 +37,18 @@ public class Siege
 	private int radius;
 	public static final int MAX_RADIUS = 2000;
 	private int ticksRemaining = 0;
+	private static final int SCORE_INTERVAL = 30 * 20;
 	private static final double EDGE_PUT_RANGE = 2D;
 	
 	private List<SiegeTeam> siegeTeams = new ArrayList();
-	private int maxTeamDifference = 8;
+	private int maxTeamDifference = 3;
+	private boolean friendlyFire = false;
+	private boolean mobSpawning = false;
 	
 	private Map<UUID, SiegePlayerData> playerDataMap = new HashMap();
+	private static final int KILLSTREAK_ANNOUNCE = 3;
+	
+	private Set<String> sentScoreboards = new HashSet();
 	
 	public Siege(String s)
 	{
@@ -66,6 +82,14 @@ public class Siege
 		radius = r;
 		isLocationSet = true;
 		markDirty();
+	}
+	
+	public boolean isLocationInSiege(double x, double y, double z)
+	{
+		double dx = x - (xPos + 0.5D);
+		double dz = z - (zPos + 0.5D);
+		double dSq = dx * dx + dz * dz;
+		return dSq <= (double)radius * (double)radius;
 	}
 	
 	public SiegeTeam getTeam(String teamName)
@@ -131,9 +155,14 @@ public class Siege
 	
 	public SiegeTeam getPlayerTeam(EntityPlayer entityplayer)
 	{
+		return getPlayerTeam(entityplayer.getUniqueID());
+	}
+	
+	public SiegeTeam getPlayerTeam(UUID playerID)
+	{
 		for (SiegeTeam team : siegeTeams)
 		{
-			if (team.containsPlayer(entityplayer))
+			if (team.containsPlayer(playerID))
 			{
 				return team;
 			}
@@ -183,6 +212,28 @@ public class Siege
 		markDirty();
 	}
 	
+	public boolean getFriendlyFire()
+	{
+		return friendlyFire;
+	}
+	
+	public void setFriendlyFire(boolean flag)
+	{
+		friendlyFire = flag;
+		markDirty();
+	}
+	
+	public boolean getMobSpawning()
+	{
+		return mobSpawning;
+	}
+	
+	public void setMobSpawning(boolean flag)
+	{
+		mobSpawning = flag;
+		markDirty();
+	}
+	
 	public boolean isSiegeWorld(World world)
 	{
 		return world.provider.dimensionId == dimension;
@@ -213,20 +264,127 @@ public class Siege
 		return ticksRemaining;
 	}
 	
+	public static String ticksToTimeString(int ticks)
+	{
+		int seconds = ticks / 20;
+        int minutes = seconds / 60;
+        seconds %= 60;
+        
+        String sSeconds = String.valueOf(seconds);
+        if (sSeconds.length() < 2)
+        {
+        	sSeconds = "0" + sSeconds;
+        }
+        
+        String sMinutes = String.valueOf(minutes);
+        
+        String timeDisplay = sMinutes + ":" + sSeconds;
+        return timeDisplay;
+	}
+	
 	public void endSiege()
 	{
 		ticksRemaining = 0;
+
+		messageAllPlayers("The siege has ended!");
+		
+		List<SiegeTeam> winningTeams = new ArrayList();
+		int winningScore = -1;
+		for (SiegeTeam team : siegeTeams)
+		{
+			int score = team.getTeamKills();
+			if (score > winningScore)
+			{
+				winningScore = score;
+				winningTeams.clear();
+				winningTeams.add(team);
+			}
+			else if (score == winningScore)
+			{
+				winningTeams.add(team);
+			}
+		}
+		String winningTeamName = "";
+		if (!winningTeams.isEmpty())
+		{
+			if (winningTeams.size() == 1)
+			{
+				SiegeTeam team = winningTeams.get(0);
+				winningTeamName = team.getTeamName();
+			}
+			else
+			{
+				for (SiegeTeam team : winningTeams)
+				{
+					if (!winningTeamName.isEmpty())
+					{
+						winningTeamName += ", ";
+					}
+					winningTeamName += team.getTeamName();
+				}
+			}
+		}
+		
+		if (winningTeams.size() == 1)
+		{
+			messageAllPlayers("Team " + winningTeamName + " won with " + winningScore + " kills!");
+		}
+		else
+		{
+			messageAllPlayers("Teams " + winningTeamName + " tied with " + winningScore + " kills each!");
+		}
+		
+		messageAllPlayers("---");
+		for (SiegeTeam team : siegeTeams)
+		{
+			String teamMsg = team.getSiegeEndMessage();
+			messageAllPlayers(teamMsg);
+		}
+		messageAllPlayers("---");
+		
+		UUID mvpID = null;
+		int mvpKills = 0;
+		int mvpDeaths = 0;
+		for (SiegeTeam team : siegeTeams)
+		{
+			for (UUID player : team.getPlayerList())
+			{
+				SiegePlayerData playerData = getPlayerData(player);
+				int kills = playerData.getKills();
+				int deaths = playerData.getDeaths();
+				if (kills > mvpKills || (kills == mvpKills && deaths < mvpDeaths))
+				{
+					mvpID = player;
+					mvpKills = kills;
+					mvpDeaths = deaths;
+				}
+			}
+		}
+		if (mvpID != null)
+		{
+			String mvp = UsernameCache.getLastKnownUsername(mvpID);
+			messageAllPlayers("MVP was " + mvp + " (" + getPlayerTeam(mvpID).getTeamName() + ") with " + mvpKills + " kills / " + mvpDeaths + " deaths");
+			messageAllPlayers("---");
+		}
+		
+		messageAllPlayers("Congratulations to " + winningTeamName + ", and well played by all!");
 		
 		List playerList = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
 		for (Object player : playerList)
 		{
-			EntityPlayer entityplayer = (EntityPlayer)player;
+			EntityPlayerMP entityplayer = (EntityPlayerMP)player;
 			if (hasPlayer(entityplayer))
 			{
 				leavePlayer(entityplayer);
-				messagePlayer(entityplayer, "The siege has ended!");
 			}
 		}
+		
+		for (SiegeTeam team : siegeTeams)
+		{
+			team.onSiegeEnd();
+		}
+		
+		sentScoreboards.clear();
 		
 		markDirty();
 	}
@@ -255,15 +413,57 @@ public class Siege
 				List playerList = world.playerEntities;
 				for (Object player : playerList)
 				{
-					EntityPlayer entityplayer = (EntityPlayer)player;
+					EntityPlayerMP entityplayer = (EntityPlayerMP)player;
 					boolean inSiege = hasPlayer(entityplayer);
 					updatePlayer(entityplayer, inSiege);
+				}
+				
+				Set<String> removeSent = new HashSet();
+				for (String playerName : sentScoreboards)
+				{
+					if (MinecraftServer.getServer().getConfigurationManager().func_152612_a(playerName) == null)
+					{
+						removeSent.add(playerName);
+					}
+				}
+				sentScoreboards.removeAll(removeSent);
+				
+				if (ticksRemaining % SCORE_INTERVAL == 0)
+				{
+					List<SiegeTeam> teamsSorted = new ArrayList();
+					teamsSorted.addAll(siegeTeams);
+					Collections.sort(teamsSorted, new Comparator<SiegeTeam>()
+					{
+						@Override
+						public int compare(SiegeTeam team1, SiegeTeam team2)
+						{
+							int score1 = team1.getTeamKills();
+							int score2 = team2.getTeamKills();
+							if (score1 > score2)
+							{
+								return -1;
+							}
+							else if (score1 < score2)
+							{
+								return 1;
+							}
+							else
+							{
+								return team1.getTeamName().compareTo(team2.getTeamName());
+							}
+						}
+					});
+					
+					for (SiegeTeam team : teamsSorted)
+					{
+						messageAllPlayers(team.getSiegeOngoingScore());
+					}
 				}
 			}
 		}
 	}
 	
-	public boolean joinPlayer(EntityPlayer entityplayer, SiegeTeam team, String kitName)
+	public boolean joinPlayer(EntityPlayer entityplayer, SiegeTeam team, Kit kit)
 	{
 		SiegePlayerData playerData = getPlayerData(entityplayer);
 		if (!playerData.getWarnedClearInv())
@@ -280,9 +480,9 @@ public class Siege
 			ChunkCoordinates teamSpawn = team.getRespawnPoint();
 			entityplayer.setPositionAndUpdate(teamSpawn.posX + 0.5D, teamSpawn.posY, teamSpawn.posZ + 0.5D);
 			
-			if (kitName != null)
+			if (kit != null)
 			{
-				getPlayerData(entityplayer).setChosenKit(kitName);
+				getPlayerData(entityplayer).setChosenKit(kit);
 			}
 			applyPlayerKit(entityplayer);
 			
@@ -290,13 +490,16 @@ public class Siege
 		}
 	}
 	
-	public void leavePlayer(EntityPlayer entityplayer)
+	public void leavePlayer(EntityPlayerMP entityplayer)
 	{
+		// TODO: implement a timer or something; for now scores stay until they relog, better than immediately disappearing
+		updateSiegeScoreboards(entityplayer);
+		
 		SiegeTeam team = getPlayerTeam(entityplayer);
 		team.leavePlayer(entityplayer);
 		
 		restoreAndClearBackupSpawnPoint(entityplayer);
-		entityplayer.inventory.clearInventory(null, -1);
+		SiegeMode.clearPlayerInv(entityplayer);
 		
 		UUID playerID = entityplayer.getUniqueID();
 		playerDataMap.remove(playerID);
@@ -309,16 +512,30 @@ public class Siege
 		entityplayer.addChatMessage(message);
 	}
 	
-	private void updatePlayer(EntityPlayer entityplayer, boolean inSiege)
+	private void messageAllPlayers(String text)
+	{
+		List playerList = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
+		for (Object player : playerList)
+		{
+			EntityPlayer entityplayer = (EntityPlayer)player;
+			if (hasPlayer(entityplayer))
+			{
+				messagePlayer(entityplayer, text);
+			}
+		}
+	}
+	
+	private void updatePlayer(EntityPlayerMP entityplayer, boolean inSiege)
 	{
 		World world = entityplayer.worldObj;
+		SiegePlayerData playerData = getPlayerData(entityplayer);
+		SiegeTeam team = getPlayerTeam(entityplayer);
 		
 		if (!entityplayer.capabilities.isCreativeMode)
 		{
-			double dx = entityplayer.posX - xPos;
-			double dz = entityplayer.posZ - zPos;
-			double dSq = dx * dx + dz * dz;
-			boolean inSiegeRange = dSq <= (double)radius * (double)radius;
+			boolean inSiegeRange = isLocationInSiege(entityplayer.posX, entityplayer.posY, entityplayer.posZ);
+			double dx = entityplayer.posX - (xPos + 0.5D);
+			double dz = entityplayer.posZ - (zPos + 0.5D);
 			float angle = (float)Math.atan2(dz, dx);
 				
 			if (inSiege)
@@ -333,6 +550,8 @@ public class Siege
 					
 					messagePlayer(entityplayer, "Stay inside the siege area!");
 				}
+				
+				FMLInterModComms.sendRuntimeMessage(SiegeMode.instance, "lotr", "FS_DISABLE", entityplayer.getCommandSenderName());
 			}
 			else
 			{
@@ -348,30 +567,166 @@ public class Siege
 				}
 			}
 		}
+		
+		updateSiegeScoreboards(entityplayer);
 	}
 	
-	public void onPlayerDeath(EntityPlayer entityplayer)
+	private void updateSiegeScoreboards(EntityPlayerMP entityplayer)
+	{
+		World world = entityplayer.worldObj;
+		SiegePlayerData playerData = getPlayerData(entityplayer);
+		SiegeTeam team = getPlayerTeam(entityplayer);
+		
+		Scoreboard scoreboard = world.getScoreboard();
+		ScoreObjective siegeObj = new ScoreObjective(scoreboard, "SiegeMode", null);
+		String displayName = "SiegeMode: " + getSiegeName();
+		siegeObj.setDisplayName(displayName);
+		
+		// TODO: change this to account for when the siege ends: remove scoreboards / start a timer etc.
+		boolean inSiege = team != null;
+		if (inSiege)
+		{
+			String kitName = "";
+			Kit currentKit = KitDatabase.getKit(playerData.getCurrentKit());
+			if (currentKit != null)
+			{
+				kitName = currentKit.getKitName();
+			}
+			
+			String timeRemaining = isActive() ? ("Remaining: " + ticksToTimeString(ticksRemaining)) : "Ended";
+			
+			// clever trick to control the ordering of the objectives: put actual scores in the 'playernames', and put the desired order in the 'scores'!
+			
+			List<Score> allSiegeStats = new ArrayList();
+			allSiegeStats.add(new Score(scoreboard, siegeObj, timeRemaining));
+			allSiegeStats.add(null);
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Team: " + team.getTeamName()));
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Kit: " + kitName));
+			allSiegeStats.add(null);
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Kills: " + playerData.getKills()));
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Deaths: " + playerData.getDeaths()));
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Killstreak: " + playerData.getKillstreak()));
+			allSiegeStats.add(null);
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Team Kills: " + team.getTeamKills()));
+			allSiegeStats.add(new Score(scoreboard, siegeObj, "Team Deaths: " + team.getTeamDeaths()));
+			
+			if (!sentScoreboards.contains(entityplayer.getCommandSenderName()))
+			{
+				sentScoreboards.add(entityplayer.getCommandSenderName());
+			}
+			else
+			{
+				// if already sent, remove the old siege objective first!
+				Packet pktRemove = new S3BPacketScoreboardObjective(siegeObj, 1);
+				entityplayer.playerNetServerHandler.sendPacket(pktRemove);
+			}
+			
+			// recreate the siege objective (or create for first time if not sent before)
+			Packet pktAdd = new S3BPacketScoreboardObjective(siegeObj, 0);
+			entityplayer.playerNetServerHandler.sendPacket(pktAdd);
+			
+			Packet pktDisplay = new S3DPacketDisplayScoreboard(1, siegeObj);
+			entityplayer.playerNetServerHandler.sendPacket(pktDisplay);
+			
+			int index = allSiegeStats.size();
+			int gaps = 0;
+			for (Score score : allSiegeStats)
+			{
+				if (score == null)
+				{
+					// create a unique gap string, based on how many gaps we've already had
+					String gapString = "";
+					for (int l = 0; l <= gaps; l++)
+					{
+						gapString += "-";
+					}
+					score = new Score(scoreboard, siegeObj, gapString);
+					gaps++;
+				}
+				
+				score.setScorePoints(index);
+				Packet pktScore = new S3CPacketUpdateScore(score, 0);
+				entityplayer.playerNetServerHandler.sendPacket(pktScore);
+				index--;
+			}
+		}
+		else
+		{
+			// TODO: this happens when you leave, but not when the siege ends.
+			// change when the timer is implemented
+			if (sentScoreboards.contains(entityplayer.getCommandSenderName()))
+			{
+				Packet pkt = new S3BPacketScoreboardObjective(siegeObj, 1);
+				entityplayer.playerNetServerHandler.sendPacket(pkt);
+				sentScoreboards.remove(entityplayer.getCommandSenderName());
+			}
+		}
+	}
+	
+	public void onPlayerDeath(EntityPlayer entityplayer, DamageSource source)
 	{
 		if (hasPlayer(entityplayer))
 		{
 			UUID playerID = entityplayer.getUniqueID();
 			SiegePlayerData playerData = getPlayerData(playerID);
+			SiegeTeam team = getPlayerTeam(entityplayer);
+			
+			if (!entityplayer.capabilities.isCreativeMode)
+			{
+				playerData.onDeath();
+				team.addTeamDeath();
+				
+				EntityPlayer killingPlayer = null;
+				Entity killer = source.getEntity();
+				if (killer instanceof EntityPlayer)
+				{
+					killingPlayer = (EntityPlayer)killer;
+				}
+				else
+				{
+					EntityLivingBase lastAttacker = entityplayer.func_94060_bK();
+					if (lastAttacker instanceof EntityPlayer)
+					{
+						killingPlayer = (EntityPlayer)lastAttacker;
+					}
+				}
+				
+				if (killingPlayer != null)
+				{
+					if (hasPlayer(killingPlayer) && !killingPlayer.capabilities.isCreativeMode)
+					{
+						SiegePlayerData killingPlayerData = getPlayerData(killingPlayer);
+						killingPlayerData.onKill();
+						SiegeTeam killingTeam = getPlayerTeam(killingPlayer);
+						killingTeam.addTeamKill();
+						
+						int killstreak = killingPlayerData.getKillstreak();
+						if (killstreak >= KILLSTREAK_ANNOUNCE)
+						{
+							messageAllPlayers(killingPlayer.getCommandSenderName() + " (" + killingTeam.getTeamName() + ") has a killstreak of " + killstreak + "!");
+						}
+					}
+				}
+			}
 			
 			String nextTeamName = playerData.getNextTeam();
 			if (nextTeamName != null)
 			{
 				SiegeTeam nextTeam = getTeam(nextTeamName);
-				if (nextTeam != null)
+				if (nextTeam != null && nextTeam != team)
 				{
-					SiegeTeam team = getPlayerTeam(entityplayer);
 					team.leavePlayer(entityplayer);
 					nextTeam.joinPlayer(entityplayer);
+					team = getPlayerTeam(entityplayer);
+					
+					messageAllPlayers(entityplayer.getCommandSenderName() + " is now playing on team " + team.getTeamName());
 				}
 				
 				playerData.setNextTeam(null);
 			}
 			
-			entityplayer.inventory.clearInventory(null, -1);
+			// to not drop siege kit
+			SiegeMode.clearPlayerInv(entityplayer);
 			
 			int dim = entityplayer.dimension;
 			ChunkCoordinates coords = entityplayer.getBedLocation(dim);
@@ -381,7 +736,6 @@ public class Siege
 			playerData.setBackupSpawnPoint(bsp);
 			markDirty();
 			
-			SiegeTeam team = getPlayerTeam(entityplayer);
 			ChunkCoordinates teamSpawn = team.getRespawnPoint();
 			entityplayer.setSpawnChunk(teamSpawn, true, dim);
 		}
@@ -415,22 +769,26 @@ public class Siege
 		UUID playerID = entityplayer.getUniqueID();
 		SiegePlayerData playerData = getPlayerData(playerID);
 		
-		String kitName = playerData.getChosenKit();
-		if (kitName == null || !team.containsKit(kitName))
+		Kit kit = KitDatabase.getKit(playerData.getChosenKit());
+		if (kit == null || !team.containsKit(kit))
 		{
-			kitName = team.getRandomKitName(entityplayer.getRNG());
-			messagePlayer(entityplayer, "No kit chosen! Using a random kit: " + kitName);
+			kit = team.getRandomKit(entityplayer.getRNG());
+			messagePlayer(entityplayer, "No kit chosen! Using a random kit: " + kit.getKitName());
 		}
 		
-		Kit kit = KitDatabase.getKit(kitName);
-		if (kit == null)
-		{
-			messagePlayer(entityplayer, "WARNING! No kit for name " + kitName + " exists! Tell an admin about this!");
-		}
-		else
-		{
-			kit.applyTo(entityplayer);
-		}
+		kit.applyTo(entityplayer);
+		playerData.setCurrentKit(kit);
+		setHasSiegeGivenKit(entityplayer, true);
+	}
+	
+	public static boolean hasSiegeGivenKit(EntityPlayer entityplayer)
+	{
+		return entityplayer.getEntityData().getBoolean("HasSiegeKit");
+	}
+	
+	public static void setHasSiegeGivenKit(EntityPlayer entityplayer, boolean flag)
+	{
+		entityplayer.getEntityData().setBoolean("HasSiegeKit", flag);
 	}
 	
 	public void markDirty()
@@ -448,10 +806,27 @@ public class Siege
 		return needsSave;
 	}
 	
+	public boolean isDeleted()
+	{
+		return deleted;
+	}
+	
+	public void deleteSiege()
+	{
+		if (isActive())
+		{
+			endSiege();
+		}
+		
+		deleted = true;
+		markDirty();
+	}
+	
 	public void writeToNBT(NBTTagCompound nbt)
 	{
 		nbt.setString("SiegeID", siegeID.toString());
 		nbt.setString("Name", siegeName);
+		nbt.setBoolean("Deleted", deleted);
 		
 		nbt.setBoolean("LocationSet", isLocationSet);
 		nbt.setInteger("Dim", dimension);
@@ -471,6 +846,8 @@ public class Siege
 		nbt.setTag("Teams", teamTags);
 		
 		nbt.setInteger("MaxTeamDiff", maxTeamDifference);
+		nbt.setBoolean("FriendlyFire", friendlyFire);
+		nbt.setBoolean("MobSpawning", mobSpawning);
 		
 		NBTTagList playerTags = new NBTTagList();
 		for (Entry<UUID, SiegePlayerData> e : playerDataMap.entrySet())
@@ -490,6 +867,7 @@ public class Siege
 	{
 		siegeID = UUID.fromString(nbt.getString("SiegeID"));
 		siegeName = nbt.getString("Name");
+		deleted = nbt.getBoolean("Deleted");
 		
 		isLocationSet = nbt.getBoolean("LocationSet");
 		dimension = nbt.getInteger("Dim");
@@ -513,6 +891,8 @@ public class Siege
 		}
 		
 		maxTeamDifference = nbt.getInteger("MaxTeamDiff");
+		friendlyFire = nbt.getBoolean("FriendlyFire");
+		mobSpawning = nbt.getBoolean("MobSpawning");
 		
 		playerDataMap.clear();
 		if (nbt.hasKey("PlayerData"))

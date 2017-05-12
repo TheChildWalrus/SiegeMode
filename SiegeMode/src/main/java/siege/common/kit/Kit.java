@@ -2,6 +2,7 @@ package siege.common.kit;
 
 import java.util.*;
 
+import siege.common.SiegeMode;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -10,20 +11,42 @@ import net.minecraftforge.common.util.Constants;
 
 public class Kit
 {
+	private boolean needsSave = false;
+	private boolean deleted = false;
+	
+	private UUID kitID;
 	private String kitName;
 	
 	private ItemStack[] armorItems = new ItemStack[4];
 	private ItemStack heldItem;
 	private List<ItemStack> otherItems = new ArrayList();
 	
+	public Kit()
+	{
+		kitID = UUID.randomUUID();
+	}
+	
+	public UUID getKitID()
+	{
+		return kitID;
+	}
+	
 	public String getKitName()
 	{
 		return kitName;
 	}
 	
+	public void rename(String s)
+	{
+		String oldName = kitName;
+		kitName = s;
+		markDirty();
+		KitDatabase.renameKit(this, oldName);
+	}
+	
 	public void applyTo(EntityPlayer entityplayer)
 	{
-		entityplayer.inventory.clearInventory(null, -1);
+		SiegeMode.clearPlayerInv(entityplayer);
 		
 		for (int i = 0; i < 4; i++)
 		{
@@ -42,39 +65,75 @@ public class Kit
 		}
 	}
 	
-	public static Kit createFrom(EntityPlayer entityplayer, String name)
+	public void createFrom(EntityPlayer entityplayer)
 	{
-		Kit kit = new Kit();
-		kit.kitName = name;
-		
+		Arrays.fill(armorItems, null);
 		for (int i = 0; i < 4; i++)
 		{
 			ItemStack armor = entityplayer.getEquipmentInSlot(4 - i);
-			kit.armorItems[i] = ItemStack.copyItemStack(armor);
+			armorItems[i] = ItemStack.copyItemStack(armor);
 		}
 		
+		heldItem = null;
+		otherItems.clear();
 		for (int i = 0; i < entityplayer.inventory.mainInventory.length; i++)
 		{
 			ItemStack itemstack = entityplayer.inventory.mainInventory[i];
 			if (i == entityplayer.inventory.currentItem)
 			{
-				kit.heldItem = ItemStack.copyItemStack(itemstack);
+				heldItem = ItemStack.copyItemStack(itemstack);
 			}
 			else
 			{
 				if (itemstack != null)
 				{
-					kit.otherItems.add(ItemStack.copyItemStack(itemstack));
+					otherItems.add(ItemStack.copyItemStack(itemstack));
 				}
 			}
 		}
 		
+		markDirty();
+	}
+	
+	public static Kit createNewKit(EntityPlayer entityplayer, String name)
+	{
+		Kit kit = new Kit();
+		kit.kitName = name;
+		kit.createFrom(entityplayer);
 		return kit;
+	}
+	
+	public void markDirty()
+	{
+		needsSave = true;
+	}
+	
+	public void markSaved()
+	{
+		needsSave = false;
+	}
+	
+	public boolean needsSave()
+	{
+		return needsSave;
+	}
+	
+	public boolean isDeleted()
+	{
+		return deleted;
+	}
+	
+	public void deleteKit()
+	{
+		deleted = true;
+		markDirty();
 	}
 	
 	public void writeToNBT(NBTTagCompound nbt)
 	{
+		nbt.setString("KitID", kitID.toString());
 		nbt.setString("Name", kitName);
+		nbt.setBoolean("Deleted", deleted);
 		
 		NBTTagList armorTags = new NBTTagList();
 		for (int i = 0; i < armorItems.length; i++)
@@ -112,7 +171,9 @@ public class Kit
 	
 	public void readFromNBT(NBTTagCompound nbt)
 	{
+		kitID = UUID.fromString(nbt.getString("KitID"));
 		kitName = nbt.getString("Name");
+		deleted = nbt.getBoolean("Deleted");
 		
 		Arrays.fill(armorItems, null);
 		if (nbt.hasKey("ArmorItems"))

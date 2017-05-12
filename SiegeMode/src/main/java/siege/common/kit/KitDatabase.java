@@ -12,21 +12,32 @@ import cpw.mods.fml.common.FMLLog;
 
 public class KitDatabase
 {
-	private static Map<String, Kit> kitMap = new HashMap();
+	private static Map<UUID, Kit> kitMap = new HashMap();
+	private static Map<String, UUID> kitNameMap = new HashMap();
+	
+	public static Kit getKit(UUID id)
+	{
+		return kitMap.get(id);
+	}
 	
 	public static Kit getKit(String name)
 	{
-		return kitMap.get(name);
+		return kitMap.get(getKitNameID(name));
+	}
+	
+	public static UUID getKitNameID(String name)
+	{
+		return kitNameMap.get(name);
 	}
 	
 	public static boolean kitExists(String name)
 	{
-		return kitMap.get(name) != null;
+		return getKit(name) != null;
 	}
 	
 	public static List<String> getAllKitNames()
 	{
-		return new ArrayList(kitMap.keySet());
+		return new ArrayList(kitNameMap.keySet());
 	}
 	
 	public static boolean validKitName(String name)
@@ -36,8 +47,28 @@ public class KitDatabase
 	
 	public static void addAndSaveKit(Kit kit)
 	{
-		kitMap.put(kit.getKitName(), kit);
+		kitMap.put(kit.getKitID(), kit);
+		putKitNameAndID(kit);
 		saveKitToFile(kit);
+	}
+	
+	private static void putKitNameAndID(Kit kit)
+	{
+		kitNameMap.put(kit.getKitName(), kit.getKitID());
+	}
+	
+	public static void renameKit(Kit kit, String oldName)
+	{
+		kitNameMap.remove(oldName);
+		putKitNameAndID(kit);
+	}
+	
+	public static void deleteKit(Kit kit)
+	{
+		kit.deleteKit();
+		saveKitToFile(kit);
+		kitMap.remove(kit.getKitID());
+		kitNameMap.remove(kit.getKitName());
 	}
 	
 	private static File getOrCreateKitDirectory()
@@ -52,18 +83,49 @@ public class KitDatabase
 	
 	private static File getKitFile(Kit kit)
 	{
-		return getKitFile(kit.getKitName());
+		File kitDir = getOrCreateKitDirectory();
+		return new File(kitDir, kit.getKitID().toString() + ".dat");
 	}
 	
-	private static File getKitFile(String kitName)
+	public static boolean anyNeedSave()
 	{
-		File kitDir = getOrCreateKitDirectory();
-		return new File(kitDir, kitName + ".dat");
+		for (Kit kit : kitMap.values())
+		{
+			if (kit.needsSave())
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public static void save()
+	{
+		try
+		{
+			int i = 0;
+			for (Kit kit : kitMap.values())
+			{
+				if (kit.needsSave())
+				{
+					saveKitToFile(kit);
+					kit.markSaved();
+					i++;
+				}
+			}
+			FMLLog.info("SiegeMode: Saved %d kits", i);
+		}
+		catch (Exception e)
+		{
+			FMLLog.severe("Error saving kits data");
+			e.printStackTrace();
+		}
 	}
 	
 	public static void reloadAll()
 	{
 		kitMap.clear();
+		kitNameMap.clear();
 		try
 		{
 			File kitDir = getOrCreateKitDirectory();
@@ -72,8 +134,12 @@ public class KitDatabase
 			for (File dat : kitFiles)
 			{
 				Kit kit = loadKitFromFile(dat);
-				kitMap.put(kit.getKitName(), kit);
-				i++;
+				if (kit != null)
+				{
+					kitMap.put(kit.getKitID(), kit);
+					putKitNameAndID(kit);
+					i++;
+				}
 			}
 			FMLLog.info("SiegeMode: Loaded %d kits", i);
 		}
@@ -91,7 +157,10 @@ public class KitDatabase
 			NBTTagCompound nbt = SiegeMode.loadNBTFromFile(kitFile);
 			Kit kit = new Kit();
 			kit.readFromNBT(nbt);
-			return kit;
+			if (!kit.isDeleted())
+			{
+				return kit;
+			}
 		}
 		catch (Exception e)
 		{

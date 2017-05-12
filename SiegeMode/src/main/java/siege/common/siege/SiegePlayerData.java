@@ -1,7 +1,10 @@
 package siege.common.siege;
 
+import java.util.UUID;
+
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
+import siege.common.kit.Kit;
 
 public class SiegePlayerData
 {
@@ -10,8 +13,13 @@ public class SiegePlayerData
 	private boolean warnedClearInv = false;
 	
 	private BackupSpawnPoint backupSpawnPoint;
-	private String chosenKit;
+	private UUID currentKit;
+	private UUID chosenKit;
 	private String nextTeam;
+	
+	private int kills;
+	private int deaths;
+	private int killstreak;
 
 	public SiegePlayerData(Siege siege)
 	{
@@ -32,15 +40,24 @@ public class SiegePlayerData
 			nbt.setBoolean("BSP_Forced", backupSpawnPoint.spawnForced);
 		}
 		
+		if (currentKit != null)
+		{
+			nbt.setString("CurrentKit", currentKit.toString());
+		}
+		
 		if (chosenKit != null)
 		{
-			nbt.setString("Kit", chosenKit);
+			nbt.setString("Kit", chosenKit.toString());
 		}
 		
 		if (nextTeam != null)
 		{
 			nbt.setString("NextTeam", nextTeam);
 		}
+		
+		nbt.setInteger("Kills", kills);
+		nbt.setInteger("Deaths", deaths);
+		nbt.setInteger("Killstreak", killstreak);
 	}
 	
 	public void readFromNBT(NBTTagCompound nbt)
@@ -59,8 +76,21 @@ public class SiegePlayerData
 			backupSpawnPoint = new BackupSpawnPoint(bspDim, bspCoords, bspForced);
 		}
 		
-		chosenKit = nbt.getString("Kit");
+		if (nbt.hasKey("CurrentKit"))
+		{
+			currentKit = UUID.fromString(nbt.getString("CurrentKit"));
+		}
+		
+		if (nbt.hasKey("Kit"))
+		{
+			chosenKit = UUID.fromString(nbt.getString("Kit"));
+		}
+		
 		nextTeam = nbt.getString("NextTeam");
+		
+		kills = nbt.getInteger("Kills");
+		deaths = nbt.getInteger("Deaths");
+		killstreak = nbt.getInteger("Killstreak");
 	}
 	
 	public boolean getWarnedClearInv()
@@ -85,14 +115,25 @@ public class SiegePlayerData
 		theSiege.markDirty();
 	}
 	
-	public String getChosenKit()
+	public UUID getCurrentKit()
+	{
+		return currentKit;
+	}
+
+	public void setCurrentKit(Kit kit)
+	{
+		currentKit = kit == null ? null : kit.getKitID();
+		theSiege.markDirty();
+	}
+	
+	public UUID getChosenKit()
 	{
 		return chosenKit;
 	}
 
-	public void setChosenKit(String kit)
+	public void setChosenKit(Kit kit)
 	{
-		chosenKit = kit;
+		chosenKit = kit == null ? null : kit.getKitID();
 		theSiege.markDirty();
 	}
 	
@@ -105,5 +146,34 @@ public class SiegePlayerData
 	{
 		nextTeam = team;
 		theSiege.markDirty();
+	}
+	
+	public int getKills()
+	{
+		return kills;
+	}
+	
+	public void onKill()
+	{
+		kills++;
+		killstreak++;
+		theSiege.markDirty();
+	}
+	
+	public int getDeaths()
+	{
+		return deaths;
+	}
+	
+	public void onDeath()
+	{
+		deaths++;
+		killstreak = 0;
+		theSiege.markDirty();
+	}
+	
+	public int getKillstreak()
+	{
+		return killstreak;
 	}
 }

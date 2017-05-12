@@ -4,6 +4,7 @@ import java.util.List;
 
 import net.minecraft.command.*;
 import net.minecraft.entity.player.EntityPlayerMP;
+import siege.common.kit.Kit;
 import siege.common.kit.KitDatabase;
 
 public class CommandSiegePlay extends CommandBase
@@ -29,7 +30,7 @@ public class CommandSiegePlay extends CommandBase
 	@Override
     public String getCommandUsage(ICommandSender sender)
     {
-        return "/siege_play <...> (use TAB key to autocomplete suggestions)";
+        return "/siege_play <...> (use TAB key to autocomplete parameters)";
     }
 	
 	@Override
@@ -59,25 +60,26 @@ public class CommandSiegePlay extends CommandBase
 						{
 							if (team.canPlayerJoin(operator))
 							{
-								String kitName = null;
+								Kit kit = null;
 								if (args.length >= 4)
 								{
 									String kitNameArg = args[3];
-									if (team.containsKit(kitNameArg) && KitDatabase.kitExists(kitNameArg))
+									Kit kitArg = KitDatabase.getKit(kitNameArg);
+									if (kitArg != null && team.containsKit(kitArg))
 									{
-										kitName = kitNameArg;
+										kit = kitArg;
 									}
 								}
 								
-								if (siege.joinPlayer(operator, team, kitName))
+								if (siege.joinPlayer(operator, team, kit))
 								{
-									if (kitName == null)
+									if (kit == null)
 									{
 										func_152373_a(sender, this, "Joined siege %s on team %s", siegeName, teamName);
 									}
 									else
 									{
-										func_152373_a(sender, this, "Joined siege %s on team %s as kit %s", siegeName, teamName, kitName);
+										func_152373_a(sender, this, "Joined siege %s on team %s as kit %s", siegeName, teamName, kit.getKitName());
 									}
 								}
 								return;
@@ -113,26 +115,27 @@ public class CommandSiegePlay extends CommandBase
 					{
 						if (team.canPlayerJoin(operator))
 						{
-							String kitName = null;
+							Kit kit = null;
 							if (args.length >= 3)
 							{
 								String kitNameArg = args[2];
-								if (team.containsKit(kitNameArg) && KitDatabase.kitExists(kitNameArg))
+								Kit kitArg = KitDatabase.getKit(kitNameArg);
+								if (kitArg != null && team.containsKit(kitArg))
 								{
-									kitName = kitNameArg;
+									kit = kitArg;
 								}
 							}
 							
 							siege.getPlayerData(operator).setNextTeam(teamName);
-							siege.getPlayerData(operator).setChosenKit(kitName);
+							siege.getPlayerData(operator).setChosenKit(kit);
 
-							if (kitName == null)
+							if (kit == null)
 							{
 								func_152373_a(sender, this, "Switching to team %s after death", teamName);
 							}
 							else
 							{
-								func_152373_a(sender, this, "Switching to team %s with kit %s after death", teamName, kitName);
+								func_152373_a(sender, this, "Switching to team %s with kit %s after death", teamName, kit.getKitName());
 							}
 							return;
 						}
@@ -159,9 +162,10 @@ public class CommandSiegePlay extends CommandBase
 					SiegeTeam team = siege.getPlayerTeam(operator);
 					String teamName = team.getTeamName();
 					String kitName = args[1];
-					if (team.containsKit(kitName) && KitDatabase.kitExists(kitName))
+					Kit kit = KitDatabase.getKit(kitName);
+					if (kit != null && team.containsKit(kit))
 					{
-						siege.getPlayerData(operator).setChosenKit(kitName);
+						siege.getPlayerData(operator).setChosenKit(kit);
 						func_152373_a(sender, this, "Switching to kit %s after death", kitName);
 						return;
 					}

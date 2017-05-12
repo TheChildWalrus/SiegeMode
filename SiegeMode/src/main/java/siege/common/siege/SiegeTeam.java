@@ -6,7 +6,9 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.*;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChunkCoordinates;
+import net.minecraftforge.common.UsernameCache;
 import net.minecraftforge.common.util.Constants;
+import siege.common.kit.Kit;
 import siege.common.kit.KitDatabase;
 
 public class SiegeTeam
@@ -14,11 +16,14 @@ public class SiegeTeam
 	private Siege theSiege;
 	private String teamName;
 	private List<UUID> teamPlayers = new ArrayList();
-	private List<String> teamKits = new ArrayList();
+	private List<UUID> teamKits = new ArrayList();
 	
 	private int respawnX;
 	private int respawnY;
 	private int respawnZ;
+	
+	private int teamKills;
+	private int teamDeaths;
 
 	public SiegeTeam(Siege siege)
 	{
@@ -49,7 +54,17 @@ public class SiegeTeam
 	
 	public boolean containsPlayer(EntityPlayer entityplayer)
 	{
-		return teamPlayers.contains(entityplayer.getUniqueID());
+		return containsPlayer(entityplayer.getUniqueID());
+	}
+	
+	public boolean containsPlayer(UUID playerID)
+	{
+		return teamPlayers.contains(playerID);
+	}
+	
+	public List<UUID> getPlayerList()
+	{
+		return teamPlayers;
 	}
 	
 	public int playerCount()
@@ -104,41 +119,51 @@ public class SiegeTeam
 		}
 	}
 	
-	public String getRandomKitName(Random random)
+	public Kit getRandomKit(Random random)
 	{
 		if (teamKits.isEmpty())
 		{
 			return null;
 		}
-		return teamKits.get(random.nextInt(teamKits.size()));
+		UUID id = teamKits.get(random.nextInt(teamKits.size()));
+		return KitDatabase.getKit(id);
 	}
 	
-	public boolean containsKit(String kitName)
+	public boolean containsKit(Kit kit)
 	{
-		return teamKits.contains(kitName);
+		return teamKits.contains(kit.getKitID());
 	}
 	
-	public void addKit(String kitName)
+	public void addKit(Kit kit)
 	{
-		teamKits.add(kitName);
+		teamKits.add(kit.getKitID());
 		theSiege.markDirty();
 	}
 	
-	public void removeKit(String kitName)
+	public void removeKit(Kit kit)
 	{
-		teamKits.remove(kitName);
+		teamKits.remove(kit.getKitID());
 		theSiege.markDirty();
 	}
 	
 	public List<String> listKitNames()
 	{
-		return new ArrayList(teamKits);
+		List<String> names = new ArrayList();
+		for (UUID kitID : teamKits)
+		{
+			Kit kit = KitDatabase.getKit(kitID);
+			if (kit != null)
+			{
+				names.add(kit.getKitName());
+			}
+		}
+		return names;
 	}
 	
 	public List<String> listUnincludedKitNames()
 	{
 		List<String> names = KitDatabase.getAllKitNames();
-		names.removeAll(teamKits);
+		names.removeAll(listKitNames());
 		return names;
 	}
 	
@@ -155,6 +180,67 @@ public class SiegeTeam
 		theSiege.markDirty();
 	}
 	
+	public int getTeamKills()
+	{
+		return teamKills;
+	}
+	
+	public void addTeamKill()
+	{
+		teamKills++;
+		theSiege.markDirty();
+	}
+	
+	public int getTeamDeaths()
+	{
+		return teamDeaths;
+	}
+	
+	public void addTeamDeath()
+	{
+		teamDeaths++;
+		theSiege.markDirty();
+	}
+	
+	public String getSiegeOngoingScore()
+	{
+		return teamName + ": Kills: " + teamKills;
+	}
+	
+	public String getSiegeEndMessage()
+	{
+		UUID mvpID = null;
+		int mvpKills = 0;
+		int mvpDeaths = 0;
+		for (UUID player : teamPlayers)
+		{
+			SiegePlayerData playerData = theSiege.getPlayerData(player);
+			int kills = playerData.getKills();
+			int deaths = playerData.getDeaths();
+			if (kills > mvpKills || (kills == mvpKills && deaths < mvpDeaths))
+			{
+				mvpID = player;
+				mvpKills = kills;
+				mvpDeaths = deaths;
+			}
+		}
+		
+		String message = teamName + ": Kills: " + teamKills + ", Deaths: " + teamDeaths;
+		if (mvpID != null)
+		{
+			String mvp = UsernameCache.getLastKnownUsername(mvpID);
+			message += (", MVP: " + mvp + " with " + mvpKills + " kills / " + mvpDeaths + " deaths");
+		}
+		return message;
+	}
+	
+	public void onSiegeEnd()
+	{
+		teamKills = 0;
+		teamDeaths = 0;
+		theSiege.markDirty();
+	}
+	
 	public void writeToNBT(NBTTagCompound nbt)
 	{
 		nbt.setString("Name", teamName);
@@ -167,15 +253,23 @@ public class SiegeTeam
 		nbt.setTag("Players", playerTags);
 		
 		NBTTagList kitTags = new NBTTagList();
-		for (String kit : teamKits)
+		for (UUID kitID : teamKits)
 		{
-			kitTags.appendTag(new NBTTagString(kit));
+			Kit kit = KitDatabase.getKit(kitID);
+			if (kit != null)
+			{
+				String kitName = kit.getKitName();
+				kitTags.appendTag(new NBTTagString(kitName));
+			}
 		}
 		nbt.setTag("Kits", kitTags);
 		
 		nbt.setInteger("RespawnX", respawnX);
 		nbt.setInteger("RespawnY", respawnY);
 		nbt.setInteger("RespawnZ", respawnZ);
+		
+		nbt.setInteger("Kills", teamKills);
+		nbt.setInteger("Deaths", teamDeaths);
 	}
 	
 	public void readFromNBT(NBTTagCompound nbt)
@@ -202,13 +296,20 @@ public class SiegeTeam
 			NBTTagList kitTags = nbt.getTagList("Kits", Constants.NBT.TAG_STRING);
 			for (int i = 0; i < kitTags.tagCount(); i++)
 			{
-				String kit = kitTags.getStringTagAt(i);
-				teamKits.add(kit);
+				String kitName = kitTags.getStringTagAt(i);
+				Kit kit = KitDatabase.getKit(kitName);
+				if (kit != null)
+				{
+					teamKits.add(kit.getKitID());
+				}
 			}
 		}
 		
 		respawnX = nbt.getInteger("RespawnX");
 		respawnY = nbt.getInteger("RespawnY");
 		respawnZ = nbt.getInteger("RespawnZ");
+		
+		teamKills = nbt.getInteger("Kills");
+		teamDeaths = nbt.getInteger("Deaths");
 	}
 }

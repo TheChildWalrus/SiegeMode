@@ -39,15 +39,28 @@ public class SiegeDatabase
 	
 	public static List<String> listActiveSiegeNames()
 	{
-		List<String> list = new ArrayList();
+		List<String> names = new ArrayList();
 		for (Siege siege : siegeMap.values())
 		{
 			if (siege.isActive())
 			{
-				list.add(siege.getSiegeName());
+				names.add(siege.getSiegeName());
 			}
 		}
-		return list;
+		return names;
+	}
+	
+	public static List<String> listInactiveSiegeNames()
+	{
+		List<String> names = new ArrayList();
+		for (Siege siege : siegeMap.values())
+		{
+			if (!siege.isActive())
+			{
+				names.add(siege.getSiegeName());
+			}
+		}
+		return names;
 	}
 	
 	public static boolean validSiegeName(String name)
@@ -78,6 +91,14 @@ public class SiegeDatabase
 		putSiegeNameAndID(siege);
 	}
 	
+	public static void deleteSiege(Siege siege)
+	{
+		siege.deleteSiege();
+		saveSiegeToFile(siege);
+		siegeMap.remove(siege.getSiegeID());
+		siegeNameMap.remove(siege.getSiegeName());
+	}
+	
 	public static void updateActiveSieges(World world)
 	{
 		for (Siege siege : siegeMap.values())
@@ -99,6 +120,19 @@ public class SiegeDatabase
 			}
 		}
 		return null;
+	}
+	
+	public static List<Siege> getActiveSiegesAtPosition(double x, double y, double z)
+	{
+		List<Siege> siegesHere = new ArrayList();
+		for (Siege siege : siegeMap.values())
+		{
+			if (siege.isActive() && siege.isLocationInSiege(x, y, z))
+			{
+				siegesHere.add(siege);
+			}
+		}
+		return siegesHere;
 	}
 	
 	private static File getOrCreateSiegeDirectory()
@@ -164,9 +198,12 @@ public class SiegeDatabase
 			for (File dat : siegeFiles)
 			{
 				Siege siege = loadSiegeFromFile(dat);
-				siegeMap.put(siege.getSiegeID(), siege);
-				putSiegeNameAndID(siege);
-				i++;
+				if (siege != null)
+				{
+					siegeMap.put(siege.getSiegeID(), siege);
+					putSiegeNameAndID(siege);
+					i++;
+				}
 			}
 			FMLLog.info("SiegeMode: Loaded %d sieges", i);
 		}
@@ -184,7 +221,10 @@ public class SiegeDatabase
 			NBTTagCompound nbt = SiegeMode.loadNBTFromFile(siegeFile);
 			Siege siege = new Siege("");
 			siege.readFromNBT(nbt);
-			return siege;
+			if (!siege.isDeleted())
+			{
+				return siege;
+			}
 		}
 		catch (Exception e)
 		{
