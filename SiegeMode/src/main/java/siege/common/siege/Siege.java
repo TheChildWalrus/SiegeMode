@@ -241,6 +241,7 @@ public class Siege
 	
 	public void startSiege(int duration)
 	{
+		playerDataMap.clear();
 		ticksRemaining = duration;
 		markDirty();
 	}
@@ -373,6 +374,7 @@ public class Siege
 				leavePlayer(entityplayer, false);
 			}
 		}
+		playerDataMap.clear();
 		
 		for (SiegeTeam team : siegeTeams)
 		{
