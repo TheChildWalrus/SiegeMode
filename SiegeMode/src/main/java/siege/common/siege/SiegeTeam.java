@@ -119,6 +119,12 @@ public class SiegeTeam
 		}
 	}
 	
+	public void clearPlayers()
+	{
+		teamPlayers.clear();
+		theSiege.markDirty();
+	}
+	
 	public Kit getRandomKit(Random random)
 	{
 		if (teamKits.isEmpty())
@@ -236,6 +242,7 @@ public class SiegeTeam
 	
 	public void onSiegeEnd()
 	{
+		teamPlayers.clear();
 		teamKills = 0;
 		teamDeaths = 0;
 		theSiege.markDirty();

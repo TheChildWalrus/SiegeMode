@@ -242,6 +242,10 @@ public class Siege
 	public void startSiege(int duration)
 	{
 		playerDataMap.clear();
+		for (SiegeTeam team : siegeTeams)
+		{
+			team.clearPlayers();
+		}
 		ticksRemaining = duration;
 		markDirty();
 	}

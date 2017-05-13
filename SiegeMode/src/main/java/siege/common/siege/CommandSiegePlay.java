@@ -179,6 +179,20 @@ public class CommandSiegePlay extends CommandBase
 					throw new CommandException("You are not currently taking part in a siege!");
 				}
 			}
+			else if (option.equals("leave"))
+			{
+				Siege siege = SiegeDatabase.getActiveSiegeForPlayer(operator);
+				if (siege != null && siege.isActive())
+				{
+					siege.leavePlayer(operator, true);
+					func_152373_a(sender, this, "Left siege %s", siege.getSiegeName());
+					return;
+				}
+				else
+				{
+					throw new CommandException("You are not currently taking part in a siege!");
+				}
+			}
 		}
 		
 		throw new WrongUsageException(getCommandUsage(sender));
@@ -197,7 +211,7 @@ public class CommandSiegePlay extends CommandBase
         	}
         	else
         	{
-        		return getListOfStringsMatchingLastWord(args, "team", "kit");
+        		return getListOfStringsMatchingLastWord(args, "team", "kit", "leave");
         	}
         }
         if (args.length >= 2)

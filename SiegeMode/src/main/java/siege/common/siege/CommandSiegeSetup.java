@@ -310,23 +310,6 @@ public class CommandSiegeSetup extends CommandBase
 						func_152373_a(sender, this, "Ended siege %s", siegeName);
 						return;
 					}
-					else if (sFunction.equals("kick"))
-					{
-						String playerName = args[3];
-						EntityPlayerMP entityplayer = getPlayer(sender, playerName);
-		                if (entityplayer == null)
-		                {
-		                    throw new PlayerNotFoundException();
-		                }
-		                if (!siege.hasPlayer(entityplayer))
-		                {
-		                	throw new CommandException("Player %s is not taking part in siege %s", playerName, siegeName);
-		                }
-		                
-						siege.leavePlayer(entityplayer, true);
-						func_152373_a(sender, this, "Removed player %s from siege %s", playerName, siegeName);
-						return;
-					}
 				}
 				else
 				{
@@ -444,17 +427,13 @@ public class CommandSiegeSetup extends CommandBase
     	        }
     	        if (args.length == 3)
     	        {
-    	        	return getListOfStringsMatchingLastWord(args, "extend", "end", "kick");
+    	        	return getListOfStringsMatchingLastWord(args, "extend", "end");
     	        }
     	        if (args.length >= 4)
     	        {
     	        	String siegeName = args[1];
     	        	Siege siege = SiegeDatabase.getSiege(siegeName);
     	        	String sFunction = args[2];
-    	        	if (sFunction.equals("kick"))
-    	        	{
-    	        		return getListOfStringsMatchingLastWord(args, siege.listAllPlayerNames().toArray(new String[0]));
-    	        	}
     	        }
         	}
         	else if (sOption.equals("delete"))
