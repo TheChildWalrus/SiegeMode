@@ -240,6 +240,38 @@ public class CommandSiegeSetup extends CommandBase
 							return;
 						}
 					}
+					else if (sFunction.equals("terrain-protect"))
+					{
+						String tOption = args[3];
+						if (tOption.equals("on"))
+						{
+							siege.setTerrainProtect(true);
+							func_152373_a(sender, this, "Enabled terrain protection in siege %s", siegeName);
+							return;
+						}
+						else if (tOption.equals("off"))
+						{
+							siege.setTerrainProtect(false);
+							func_152373_a(sender, this, "Disabled terrain protection in siege %s", siegeName);
+							return;
+						}
+					}
+					else if (sFunction.equals("terrain-protect-inactive"))
+					{
+						String tOption = args[3];
+						if (tOption.equals("on"))
+						{
+							siege.setTerrainProtectInactive(true);
+							func_152373_a(sender, this, "Enabled inactive terrain protection in siege %s", siegeName);
+							return;
+						}
+						else if (tOption.equals("off"))
+						{
+							siege.setTerrainProtectInactive(false);
+							func_152373_a(sender, this, "Disabled inactive terrain protection in siege %s", siegeName);
+							return;
+						}
+					}
 				}
 				else
 				{
@@ -355,7 +387,7 @@ public class CommandSiegeSetup extends CommandBase
     	        }
     	        if (args.length == 3)
     	        {
-    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "friendly-fire", "mob-spawning");
+    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "friendly-fire", "mob-spawning", "terrain-protect", "terrain-protect-inactive");
     	        }
     	        if (args.length >= 4)
     	        {
@@ -405,11 +437,7 @@ public class CommandSiegeSetup extends CommandBase
     	        			}
     	        		}
     	        	}
-    	        	else if (sFunction.equals("friendly-fire"))
-    	        	{
-    	        		return getListOfStringsMatchingLastWord(args, "on", "off");
-    	        	}
-    	        	else if (sFunction.equals("mob-spawning"))
+    	        	else if (sFunction.equals("friendly-fire") || sFunction.equals("mob-spawning") || sFunction.equals("terrain-protect") || sFunction.equals("terrain-protect-inactive"))
     	        	{
     	        		return getListOfStringsMatchingLastWord(args, "on", "off");
     	        	}

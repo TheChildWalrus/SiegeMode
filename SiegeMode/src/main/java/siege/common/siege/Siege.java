@@ -41,6 +41,8 @@ public class Siege
 	private int maxTeamDifference = 3;
 	private boolean friendlyFire = false;
 	private boolean mobSpawning = false;
+	private boolean terrainProtect = true;
+	private boolean terrainProtectInactive = false;
 	
 	private Map<UUID, SiegePlayerData> playerDataMap = new HashMap();
 	private static final int KILLSTREAK_ANNOUNCE = 3;
@@ -131,14 +133,16 @@ public class Siege
 	
 	public int getSmallestTeamSize()
 	{
-		int smallestSize = Integer.MAX_VALUE;
+		boolean flag = false;
+		int smallestSize = -1;
 		for (SiegeTeam team : siegeTeams)
 		{
 			int size = team.playerCount();
-			if (size < smallestSize)
+			if (!flag || size < smallestSize)
 			{
 				smallestSize = size;
 			}
+			flag = true;
 		}
 		return smallestSize;
 	}
@@ -226,6 +230,28 @@ public class Siege
 	public void setMobSpawning(boolean flag)
 	{
 		mobSpawning = flag;
+		markDirty();
+	}
+	
+	public boolean getTerrainProtect()
+	{
+		return terrainProtect;
+	}
+	
+	public void setTerrainProtect(boolean flag)
+	{
+		terrainProtect = flag;
+		markDirty();
+	}
+	
+	public boolean getTerrainProtectInactive()
+	{
+		return terrainProtectInactive;
+	}
+	
+	public void setTerrainProtectInactive(boolean flag)
+	{
+		terrainProtectInactive = flag;
 		markDirty();
 	}
 	
@@ -754,6 +780,8 @@ public class Siege
 		nbt.setInteger("MaxTeamDiff", maxTeamDifference);
 		nbt.setBoolean("FriendlyFire", friendlyFire);
 		nbt.setBoolean("MobSpawning", mobSpawning);
+		nbt.setBoolean("TerrainProtect", terrainProtect);
+		nbt.setBoolean("TerrainProtectInactive", terrainProtectInactive);
 		
 		NBTTagList playerTags = new NBTTagList();
 		for (Entry<UUID, SiegePlayerData> e : playerDataMap.entrySet())
@@ -799,6 +827,8 @@ public class Siege
 		maxTeamDifference = nbt.getInteger("MaxTeamDiff");
 		friendlyFire = nbt.getBoolean("FriendlyFire");
 		mobSpawning = nbt.getBoolean("MobSpawning");
+		terrainProtect = nbt.getBoolean("TerrainProtect");
+		terrainProtectInactive = nbt.getBoolean("TerrainProtectInactive");
 		
 		playerDataMap.clear();
 		if (nbt.hasKey("PlayerData"))

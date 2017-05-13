@@ -84,11 +84,6 @@ public class SiegeTeam
 	
 	public boolean canPlayerJoin(EntityPlayer entityplayer)
 	{
-		if (containsPlayer(entityplayer))
-		{
-			return false;
-		}
-		
 		int count = playerCount();
 		int lowestCount = theSiege.getSmallestTeamSize();
 		if (count - lowestCount > theSiege.getMaxTeamDifference())

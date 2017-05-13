@@ -135,6 +135,19 @@ public class SiegeDatabase
 		return siegesHere;
 	}
 	
+	public static List<Siege> getInactiveSiegesAtPosition(double x, double y, double z)
+	{
+		List<Siege> siegesHere = new ArrayList();
+		for (Siege siege : siegeMap.values())
+		{
+			if (!siege.isActive() && !siege.isDeleted() && siege.isLocationInSiege(x, y, z))
+			{
+				siegesHere.add(siege);
+			}
+		}
+		return siegesHere;
+	}
+	
 	private static File getOrCreateSiegeDirectory()
 	{
 		File dir = new File(SiegeMode.getSiegeRootDirectory(), "sieges");
