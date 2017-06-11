@@ -7,8 +7,11 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.potion.Potion;
+import net.minecraft.potion.PotionEffect;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.*;
 import net.minecraft.world.World;
@@ -33,9 +36,12 @@ public class Siege
 	private int zPos;
 	private int radius;
 	public static final int MAX_RADIUS = 2000;
+	private static final double EDGE_PUT_RANGE = 2D;
+	
 	private int ticksRemaining = 0;
 	private static final int SCORE_INTERVAL = 30 * 20;
-	private static final double EDGE_PUT_RANGE = 2D;
+	private boolean announceActive = true;
+	private static final int ANNOUNCE_ACTIVE_INTERVAL = 60 * 20;
 	
 	private List<SiegeTeam> siegeTeams = new ArrayList();
 	private int maxTeamDifference = 3;
@@ -46,6 +52,10 @@ public class Siege
 	
 	private Map<UUID, SiegePlayerData> playerDataMap = new HashMap();
 	private static final int KILLSTREAK_ANNOUNCE = 3;
+	private int respawnImmunity = 5;
+	
+	// required to ensure each sent scoreboard objective is a unique objective
+	public static int siegeObjectiveNumber = 0;
 	
 	public Siege(String s)
 	{
@@ -211,6 +221,17 @@ public class Siege
 		markDirty();
 	}
 	
+	public int getRespawnImmunity()
+	{
+		return respawnImmunity;
+	}
+	
+	public void setRespawnImmunity(int seconds)
+	{
+		respawnImmunity = seconds;
+		markDirty();
+	}
+	
 	public boolean getFriendlyFire()
 	{
 		return friendlyFire;
@@ -274,6 +295,8 @@ public class Siege
 		}
 		ticksRemaining = duration;
 		markDirty();
+		
+		announceActiveSiege();
 	}
 	
 	public void extendSiege(int duration)
@@ -312,7 +335,7 @@ public class Siege
 	{
 		ticksRemaining = 0;
 
-		messageAllPlayers("The siege has ended!");
+		messageAllSiegePlayers("The siege has ended!");
 		
 		List<SiegeTeam> winningTeams = new ArrayList();
 		int winningScore = -1;
@@ -353,47 +376,65 @@ public class Siege
 		
 		if (winningTeams.size() == 1)
 		{
-			messageAllPlayers("Team " + winningTeamName + " won with " + winningScore + " kills!");
+			messageAllSiegePlayers("Team " + winningTeamName + " won with " + winningScore + " kills!");
 		}
 		else
 		{
-			messageAllPlayers("Teams " + winningTeamName + " tied with " + winningScore + " kills each!");
+			messageAllSiegePlayers("Teams " + winningTeamName + " tied with " + winningScore + " kills each!");
 		}
 		
-		messageAllPlayers("---");
+		messageAllSiegePlayers("---");
 		for (SiegeTeam team : siegeTeams)
 		{
 			String teamMsg = team.getSiegeEndMessage();
-			messageAllPlayers(teamMsg);
+			messageAllSiegePlayers(teamMsg);
 		}
-		messageAllPlayers("---");
+		messageAllSiegePlayers("---");
 		
 		UUID mvpID = null;
 		int mvpKills = 0;
 		int mvpDeaths = 0;
+		int mvpScore = Integer.MIN_VALUE;
+		UUID longestKillstreakID = null;
+		int longestKillstreak = 0;
 		for (SiegeTeam team : siegeTeams)
 		{
 			for (UUID player : team.getPlayerList())
 			{
 				SiegePlayerData playerData = getPlayerData(player);
+				
 				int kills = playerData.getKills();
 				int deaths = playerData.getDeaths();
-				if (kills > mvpKills || (kills == mvpKills && deaths < mvpDeaths))
+				int score = kills - deaths;
+				if (score > mvpScore || (score == mvpScore && deaths < mvpDeaths))
 				{
 					mvpID = player;
 					mvpKills = kills;
 					mvpDeaths = deaths;
+					mvpScore = score;
+				}
+				
+				int streak = playerData.getLongestKillstreak();
+				if (streak > longestKillstreak)
+				{
+					longestKillstreakID = player;
+					longestKillstreak = streak;
 				}
 			}
 		}
 		if (mvpID != null)
 		{
 			String mvp = UsernameCache.getLastKnownUsername(mvpID);
-			messageAllPlayers("MVP was " + mvp + " (" + getPlayerTeam(mvpID).getTeamName() + ") with " + mvpKills + " kills / " + mvpDeaths + " deaths");
-			messageAllPlayers("---");
+			messageAllSiegePlayers("MVP was " + mvp + " (" + getPlayerTeam(mvpID).getTeamName() + ") with " + mvpKills + " kills / " + mvpDeaths + " deaths");
 		}
+		if (longestKillstreakID != null)
+		{
+			String streakPlayer = UsernameCache.getLastKnownUsername(longestKillstreakID);
+			messageAllSiegePlayers("Longest killstreak was " + streakPlayer + " (" + getPlayerTeam(longestKillstreakID).getTeamName() + ") with a killstreak of " + longestKillstreak);
+		}
+		messageAllSiegePlayers("---");
 		
-		messageAllPlayers("Congratulations to " + winningTeamName + ", and well played by all!");
+		messageAllSiegePlayers("Congratulations to " + winningTeamName + ", and well played by all!");
 		
 		List playerList = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
 		for (Object player : playerList)
@@ -435,6 +476,11 @@ public class Siege
 			}
 			else
 			{
+				if (announceActive && ticksRemaining % ANNOUNCE_ACTIVE_INTERVAL == 0)
+				{
+					announceActiveSiege();
+				}
+				
 				List playerList = world.playerEntities;
 				for (Object player : playerList)
 				{
@@ -471,21 +517,36 @@ public class Siege
 					
 					for (SiegeTeam team : teamsSorted)
 					{
-						messageAllPlayers(team.getSiegeOngoingScore());
+						messageAllSiegePlayers(team.getSiegeOngoingScore());
 					}
 				}
 			}
 		}
 	}
 	
+	public boolean isPlayerInDimension(EntityPlayer entityplayer)
+	{
+		return entityplayer.dimension == dimension;
+	}
+	
 	public boolean joinPlayer(EntityPlayer entityplayer, SiegeTeam team, Kit kit)
 	{
-		SiegePlayerData playerData = getPlayerData(entityplayer);
-		if (!playerData.getWarnedClearInv())
+		boolean hasAnyItems = false;
+		checkForItems:
+		for (int i = 0; i < entityplayer.inventory.getSizeInventory(); i++)
 		{
-			messagePlayer(entityplayer, "WARNING! Joining a siege will clear all items from your inventory!");
-			messagePlayer(entityplayer, "You will not be warned again!");
-			playerData.setWarnedClearInv(true);
+			ItemStack itemstack = entityplayer.inventory.getStackInSlot(i);
+			if (itemstack != null)
+			{
+				hasAnyItems = true;
+				break checkForItems;
+			}
+		}
+		
+		if (hasAnyItems)
+		{
+			messagePlayer(entityplayer, "Your inventory must be clear before joining the siege!");
+			messagePlayer(entityplayer, "Put your items somewhere safe");
 			return false;
 		}
 		else
@@ -495,7 +556,7 @@ public class Siege
 			ChunkCoordinates teamSpawn = team.getRespawnPoint();
 			entityplayer.setPositionAndUpdate(teamSpawn.posX + 0.5D, teamSpawn.posY, teamSpawn.posZ + 0.5D);
 			
-			if (kit != null)
+			if (kit != null && team.isKitAvailable(kit))
 			{
 				getPlayerData(entityplayer).setChosenKit(kit);
 			}
@@ -514,30 +575,47 @@ public class Siege
 		team.leavePlayer(entityplayer);
 		
 		restoreAndClearBackupSpawnPoint(entityplayer);
-		SiegeMode.clearPlayerInv(entityplayer);
+		Kit.clearPlayerInvAndKit(entityplayer);
 		
 		UUID playerID = entityplayer.getUniqueID();
 		playerDataMap.remove(playerID);
 	}
 	
-	public void messagePlayer(EntityPlayer entityplayer, String text)
+	public static void messagePlayer(EntityPlayer entityplayer, String text)
+	{
+		messagePlayer(entityplayer, text, EnumChatFormatting.RED);
+	}
+	
+	public static void messagePlayer(EntityPlayer entityplayer, String text, EnumChatFormatting color)
 	{
 		IChatComponent message = new ChatComponentText(text);
-		message.getChatStyle().setColor(EnumChatFormatting.RED);
+		message.getChatStyle().setColor(color);
 		entityplayer.addChatMessage(message);
 	}
 	
-	private void messageAllPlayers(String text)
+	private void messageAllSiegePlayers(String text)
+	{
+		messageAllPlayers(text, EnumChatFormatting.RED, true);
+	}
+	
+	private void messageAllPlayers(String text, EnumChatFormatting color, boolean onlyInSiege)
 	{
 		List playerList = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
 		for (Object player : playerList)
 		{
 			EntityPlayer entityplayer = (EntityPlayer)player;
-			if (hasPlayer(entityplayer))
+			if (!onlyInSiege || hasPlayer(entityplayer))
 			{
-				messagePlayer(entityplayer, text);
+				messagePlayer(entityplayer, text, color);
 			}
 		}
+	}
+	
+	private void announceActiveSiege()
+	{
+		String name = getSiegeName();
+		String joinMsg = "To join the active siege " + name + ", put your items somewhere safe, then do /siege_play join " + name + " [use TAB key to choose team and kit]";
+		messageAllPlayers(joinMsg, EnumChatFormatting.GOLD, false);
 	}
 	
 	private void updatePlayer(EntityPlayerMP entityplayer, boolean inSiege)
@@ -626,7 +704,7 @@ public class Siege
 						int killstreak = killingPlayerData.getKillstreak();
 						if (killstreak >= KILLSTREAK_ANNOUNCE)
 						{
-							messageAllPlayers(killingPlayer.getCommandSenderName() + " (" + killingTeam.getTeamName() + ") has a killstreak of " + killstreak + "!");
+							messageAllSiegePlayers(killingPlayer.getCommandSenderName() + " (" + killingTeam.getTeamName() + ") has a killstreak of " + killstreak + "!");
 						}
 					}
 				}
@@ -642,14 +720,14 @@ public class Siege
 					nextTeam.joinPlayer(entityplayer);
 					team = getPlayerTeam(entityplayer);
 					
-					messageAllPlayers(entityplayer.getCommandSenderName() + " is now playing on team " + team.getTeamName());
+					messageAllSiegePlayers(entityplayer.getCommandSenderName() + " is now playing on team " + team.getTeamName());
 				}
 				
 				playerData.setNextTeam(null);
 			}
 			
 			// to not drop siege kit
-			SiegeMode.clearPlayerInv(entityplayer);
+			Kit.clearPlayerInvAndKit(entityplayer);
 			
 			int dim = entityplayer.dimension;
 			ChunkCoordinates coords = entityplayer.getBedLocation(dim);
@@ -702,6 +780,11 @@ public class Siege
 		kit.applyTo(entityplayer);
 		playerData.setCurrentKit(kit);
 		setHasSiegeGivenKit(entityplayer, true);
+		
+		if (respawnImmunity > 0)
+		{
+			entityplayer.addPotionEffect(new PotionEffect(Potion.field_76444_x.id, respawnImmunity * 20, 64));
+		}
 	}
 	
 	public static boolean hasSiegeGivenKit(EntityPlayer entityplayer)
@@ -712,6 +795,15 @@ public class Siege
 	public static void setHasSiegeGivenKit(EntityPlayer entityplayer, boolean flag)
 	{
 		entityplayer.getEntityData().setBoolean("HasSiegeKit", flag);
+	}
+	
+	public void onPlayerLogin(EntityPlayerMP entityplayer)
+	{
+		SiegePlayerData playerData = getPlayerData(entityplayer);
+		if (playerData != null)
+		{
+			playerData.onLogin(entityplayer);
+		}
 	}
 	
 	public void onPlayerLogout(EntityPlayerMP entityplayer)
@@ -782,6 +874,7 @@ public class Siege
 		nbt.setBoolean("MobSpawning", mobSpawning);
 		nbt.setBoolean("TerrainProtect", terrainProtect);
 		nbt.setBoolean("TerrainProtectInactive", terrainProtectInactive);
+		nbt.setInteger("RespawnImmunity", respawnImmunity);
 		
 		NBTTagList playerTags = new NBTTagList();
 		for (Entry<UUID, SiegePlayerData> e : playerDataMap.entrySet())
@@ -829,6 +922,10 @@ public class Siege
 		mobSpawning = nbt.getBoolean("MobSpawning");
 		terrainProtect = nbt.getBoolean("TerrainProtect");
 		terrainProtectInactive = nbt.getBoolean("TerrainProtectInactive");
+		if (nbt.hasKey("RespawnImmunity"))
+		{
+			respawnImmunity = nbt.getInteger("RespawnImmunity");
+		}
 		
 		playerDataMap.clear();
 		if (nbt.hasKey("PlayerData"))

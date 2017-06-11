@@ -2,12 +2,13 @@ package siege.common.kit;
 
 import java.util.*;
 
-import siege.common.SiegeMode;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.common.util.Constants;
+import siege.common.SiegeMode;
 
 public class Kit
 {
@@ -20,6 +21,7 @@ public class Kit
 	private ItemStack[] armorItems = new ItemStack[4];
 	private ItemStack heldItem;
 	private List<ItemStack> otherItems = new ArrayList();
+	private List<PotionEffect> potionEffects = new ArrayList();
 	
 	public Kit()
 	{
@@ -46,7 +48,7 @@ public class Kit
 	
 	public void applyTo(EntityPlayer entityplayer)
 	{
-		SiegeMode.clearPlayerInv(entityplayer);
+		clearPlayerInvAndKit(entityplayer);
 		
 		for (int i = 0; i < 4; i++)
 		{
@@ -62,6 +64,13 @@ public class Kit
 		for (ItemStack itemstack : otherItems)
 		{
 			entityplayer.inventory.addItemStackToInventory(ItemStack.copyItemStack((itemstack)));
+		}
+		
+		entityplayer.clearActivePotions();
+		for (PotionEffect potion : potionEffects)
+		{
+			PotionEffect copy = new PotionEffect(potion);
+			entityplayer.addPotionEffect(copy);
 		}
 	}
 	
@@ -92,6 +101,14 @@ public class Kit
 			}
 		}
 		
+		potionEffects.clear();
+		for (Object obj : entityplayer.getActivePotionEffects())
+		{
+			PotionEffect potion = (PotionEffect)obj;
+			PotionEffect copy = new PotionEffect(potion);
+			potionEffects.add(copy);
+		}
+		
 		markDirty();
 	}
 	
@@ -101,6 +118,12 @@ public class Kit
 		kit.kitName = name;
 		kit.createFrom(entityplayer);
 		return kit;
+	}
+	
+	public static void clearPlayerInvAndKit(EntityPlayer entityplayer)
+	{
+		entityplayer.inventory.clearInventory(null, -1);
+		entityplayer.clearActivePotions();
 	}
 	
 	public void markDirty()
@@ -167,6 +190,18 @@ public class Kit
 			}
 			nbt.setTag("OtherItems", otherTags);
 		}
+		
+		if (!potionEffects.isEmpty())
+		{
+			NBTTagList potionTags = new NBTTagList();
+			for (PotionEffect potion : potionEffects)
+			{
+				NBTTagCompound potionData = new NBTTagCompound();
+				potion.writeCustomPotionEffectToNBT(potionData);
+				potionTags.appendTag(potionData);
+			}
+			nbt.setTag("Potions", potionTags);
+		}
 	}
 	
 	public void readFromNBT(NBTTagCompound nbt)
@@ -211,6 +246,21 @@ public class Kit
 				if (itemstack != null)
 				{
 					otherItems.add(itemstack);
+				}
+			}
+		}
+		
+		potionEffects.clear();
+		if (nbt.hasKey("Potions"))
+		{
+			NBTTagList potionTags = nbt.getTagList("Potions", Constants.NBT.TAG_COMPOUND);
+			for (int i = 0; i < potionTags.tagCount(); i++)
+			{
+				NBTTagCompound potionData = potionTags.getCompoundTagAt(i);
+				PotionEffect potion = PotionEffect.readCustomPotionEffectFromNBT(potionData);
+				if (potion != null)
+				{
+					potionEffects.add(potion);
 				}
 			}
 		}

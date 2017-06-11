@@ -17,6 +17,7 @@ public class SiegeTeam
 	private String teamName;
 	private List<UUID> teamPlayers = new ArrayList();
 	private List<UUID> teamKits = new ArrayList();
+	private Map<UUID, Integer> teamKitLimits = new HashMap();
 	
 	private int respawnX;
 	private int respawnY;
@@ -122,12 +123,23 @@ public class SiegeTeam
 	
 	public Kit getRandomKit(Random random)
 	{
-		if (teamKits.isEmpty())
+		List<Kit> availableKits = new ArrayList();
+		for (UUID kitID : teamKits)
+		{
+			Kit kit = KitDatabase.getKit(kitID);
+			if (kit != null && isKitAvailable(kit))
+			{
+				availableKits.add(kit);
+			}
+		}
+		
+		if (availableKits.isEmpty())
 		{
 			return null;
 		}
-		UUID id = teamKits.get(random.nextInt(teamKits.size()));
-		return KitDatabase.getKit(id);
+		
+		Kit kit = availableKits.get(random.nextInt(availableKits.size()));
+		return kit;
 	}
 	
 	public boolean containsKit(Kit kit)
@@ -145,6 +157,62 @@ public class SiegeTeam
 	{
 		teamKits.remove(kit.getKitID());
 		theSiege.markDirty();
+	}
+	
+	public boolean isKitLimited(Kit kit)
+	{
+		return getKitLimit(kit) >= 0;
+	}
+	
+	public int getKitLimit(Kit kit)
+	{
+		UUID kitID = kit.getKitID();
+		if (teamKitLimits.containsKey(kitID))
+		{
+			return teamKitLimits.get(kitID);
+		}
+		return -1;
+	}
+	
+	public void limitKit(Kit kit, int limit)
+	{
+		teamKitLimits.put(kit.getKitID(), limit);
+		theSiege.markDirty();
+	}
+	
+	public void unlimitKit(Kit kit)
+	{
+		teamKitLimits.remove(kit.getKitID());
+		theSiege.markDirty();
+	}
+	
+	public boolean isKitAvailable(Kit kit)
+	{
+		if (isKitLimited(kit))
+		{
+			int limit = getKitLimit(kit);
+			int using = countPlayersUsingKit(kit);
+			if (using >= limit)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	private int countPlayersUsingKit(Kit kit)
+	{
+		UUID kitID = kit.getKitID();
+		int i = 0;
+		for (UUID player : teamPlayers)
+		{
+			SiegePlayerData playerData = theSiege.getPlayerData(player);
+			if (playerData != null && kitID.equals(playerData.getChosenKit()))
+			{
+				i++;
+			}
+		}
+		return i;
 	}
 	
 	public List<String> listKitNames()
@@ -213,16 +281,19 @@ public class SiegeTeam
 		UUID mvpID = null;
 		int mvpKills = 0;
 		int mvpDeaths = 0;
+		int mvpScore = Integer.MIN_VALUE;
 		for (UUID player : teamPlayers)
 		{
 			SiegePlayerData playerData = theSiege.getPlayerData(player);
 			int kills = playerData.getKills();
 			int deaths = playerData.getDeaths();
-			if (kills > mvpKills || (kills == mvpKills && deaths < mvpDeaths))
+			int score = kills - deaths;
+			if (score > mvpScore || (score == mvpScore && deaths < mvpDeaths))
 			{
 				mvpID = player;
 				mvpKills = kills;
 				mvpDeaths = deaths;
+				mvpScore = score;
 			}
 		}
 		
@@ -260,11 +331,18 @@ public class SiegeTeam
 			Kit kit = KitDatabase.getKit(kitID);
 			if (kit != null)
 			{
+				NBTTagCompound kitData = new NBTTagCompound();
 				String kitName = kit.getKitName();
-				kitTags.appendTag(new NBTTagString(kitName));
+				kitData.setString("Name", kitName);
+				if (teamKitLimits.containsKey(kitID))
+				{
+					int limit = teamKitLimits.get(kitID);
+					kitData.setInteger("Limit", limit);
+				}
+				kitTags.appendTag(kitData);
 			}
 		}
-		nbt.setTag("Kits", kitTags);
+		nbt.setTag("TeamKits", kitTags);
 		
 		nbt.setInteger("RespawnX", respawnX);
 		nbt.setInteger("RespawnY", respawnY);
@@ -293,7 +371,27 @@ public class SiegeTeam
 		}
 		
 		teamKits.clear();
-		if (nbt.hasKey("Kits"))
+		teamKitLimits.clear();
+		if (nbt.hasKey("TeamKits"))
+		{
+			NBTTagList kitTags = nbt.getTagList("TeamKits", Constants.NBT.TAG_COMPOUND);
+			for (int i = 0; i < kitTags.tagCount(); i++)
+			{
+				NBTTagCompound kitData = kitTags.getCompoundTagAt(i);
+				String kitName = kitData.getString("Name");
+				Kit kit = KitDatabase.getKit(kitName);
+				if (kit != null)
+				{
+					teamKits.add(kit.getKitID());
+					if (kitData.hasKey("Limit"))
+					{
+						int limit = kitData.getInteger("Limit");
+						teamKitLimits.put(kit.getKitID(), limit);
+					}
+				}
+			}
+		}
+		else if (nbt.hasKey("Kits"))
 		{
 			NBTTagList kitTags = nbt.getTagList("Kits", Constants.NBT.TAG_STRING);
 			for (int i = 0; i < kitTags.tagCount(); i++)

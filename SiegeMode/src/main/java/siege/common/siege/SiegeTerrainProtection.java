@@ -10,7 +10,7 @@ public class SiegeTerrainProtection
 	private static final int MESSAGE_INTERVAL_SECONDS = 2;
 	private static final Map<UUID, Long> lastPlayerMsgTimes = new HashMap();
 	
-	public static boolean isProtected(EntityPlayer entityplayer, World world, int i, int j, int k, boolean message)
+	public static boolean isProtected(EntityPlayer entityplayer, World world, int i, int j, int k)
 	{
 		if (!entityplayer.capabilities.isCreativeMode)
 		{
@@ -23,7 +23,6 @@ public class SiegeTerrainProtection
 			{
 				if (siege.getTerrainProtect())
 				{
-					warnPlayer(siege, entityplayer, "You cannot break or place blocks during a siege");
 					return true;
 				}
 			}
@@ -33,7 +32,6 @@ public class SiegeTerrainProtection
 			{
 				if (siege.getTerrainProtectInactive())
 				{
-					warnPlayer(siege, entityplayer, "You cannot break or place blocks in a protected siege arena");
 					return true;
 				}
 			}
@@ -41,7 +39,7 @@ public class SiegeTerrainProtection
 		return false;
 	}
 	
-	private static void warnPlayer(Siege siege, EntityPlayer entityplayer, String message)
+	public static void warnPlayer(EntityPlayer entityplayer, String message)
 	{
 		UUID playerID = entityplayer.getUniqueID();
 		long currentTimeMs = System.currentTimeMillis();
@@ -58,8 +56,8 @@ public class SiegeTerrainProtection
 		
 		if (send)
 		{
-			siege.messagePlayer(entityplayer, message);
+			Siege.messagePlayer(entityplayer, message);
+			lastPlayerMsgTimes.put(playerID, currentTimeMs);
 		}
-		lastPlayerMsgTimes.put(playerID, currentTimeMs);
 	}
 }

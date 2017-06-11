@@ -61,9 +61,4 @@ public class SiegeMode
 	{
 		CompressedStreamTools.writeCompressed(nbt, new FileOutputStream(file));
 	}
-	
-	public static void clearPlayerInv(EntityPlayer entityplayer)
-	{
-		entityplayer.inventory.clearInventory(null, -1);
-	}
 }

@@ -15,20 +15,19 @@ import siege.common.kit.KitDatabase;
 public class SiegePlayerData
 {
 	private Siege theSiege;
-	
-	private boolean warnedClearInv = false;
-	
+
 	private BackupSpawnPoint backupSpawnPoint;
 	private UUID currentKit;
 	private UUID chosenKit;
+	private boolean clearedLimitedKit = false;
 	private String nextTeam;
 	
 	private int kills;
 	private int deaths;
 	private int killstreak;
+	private int longestKillstreak;
 	
 	private ScoreObjective lastSentSiegeObjective = null;
-	private int siegeObjectiveCount = 0;
 
 	public SiegePlayerData(Siege siege)
 	{
@@ -37,8 +36,6 @@ public class SiegePlayerData
 	
 	public void writeToNBT(NBTTagCompound nbt)
 	{
-		nbt.setBoolean("WarnedClearInv", warnedClearInv);
-		
 		if (backupSpawnPoint != null)
 		{
 			nbt.setInteger("BSP_Dim", backupSpawnPoint.dimension);
@@ -59,6 +56,8 @@ public class SiegePlayerData
 			nbt.setString("Kit", chosenKit.toString());
 		}
 		
+		nbt.setBoolean("ClearedLimitedKit", clearedLimitedKit);
+		
 		if (nextTeam != null)
 		{
 			nbt.setString("NextTeam", nextTeam);
@@ -67,12 +66,11 @@ public class SiegePlayerData
 		nbt.setInteger("Kills", kills);
 		nbt.setInteger("Deaths", deaths);
 		nbt.setInteger("Killstreak", killstreak);
+		nbt.setInteger("LongestKillstreak", longestKillstreak);
 	}
 	
 	public void readFromNBT(NBTTagCompound nbt)
 	{
-		warnedClearInv = nbt.getBoolean("WarnedClearInv");
-		
 		backupSpawnPoint = null;
 		if (nbt.hasKey("BSP_Dim"))
 		{
@@ -95,22 +93,14 @@ public class SiegePlayerData
 			chosenKit = UUID.fromString(nbt.getString("Kit"));
 		}
 		
+		clearedLimitedKit = nbt.getBoolean("ClearedLimitedKit");
+		
 		nextTeam = nbt.getString("NextTeam");
 		
 		kills = nbt.getInteger("Kills");
 		deaths = nbt.getInteger("Deaths");
 		killstreak = nbt.getInteger("Killstreak");
-	}
-	
-	public boolean getWarnedClearInv()
-	{
-		return warnedClearInv;
-	}
-	
-	public void setWarnedClearInv(boolean flag)
-	{
-		warnedClearInv = flag;
-		theSiege.markDirty();
+		longestKillstreak = nbt.getInteger("LongestKillstreak");
 	}
 	
 	public BackupSpawnPoint getBackupSpawnPoint()
@@ -146,6 +136,11 @@ public class SiegePlayerData
 		theSiege.markDirty();
 	}
 	
+	public void setRandomChosenKit()
+	{
+		setChosenKit(null);
+	}
+	
 	public String getNextTeam()
 	{
 		return nextTeam;
@@ -166,6 +161,10 @@ public class SiegePlayerData
 	{
 		kills++;
 		killstreak++;
+		if (killstreak > longestKillstreak)
+		{
+			longestKillstreak = killstreak;
+		}
 		theSiege.markDirty();
 	}
 	
@@ -186,9 +185,37 @@ public class SiegePlayerData
 		return killstreak;
 	}
 	
+	public int getLongestKillstreak()
+	{
+		return longestKillstreak;
+	}
+	
+	public void onLogin(EntityPlayerMP entityplayer)
+	{
+		if (clearedLimitedKit)
+		{
+			clearedLimitedKit = false;
+			theSiege.messagePlayer(entityplayer, "Your limited kit was deselected on logout so others may use it!");
+			theSiege.messagePlayer(entityplayer, "Switching to random kit selection after death");
+			theSiege.markDirty();
+		}
+	}
+	
 	public void onLogout(EntityPlayerMP entityplayer)
 	{
 		lastSentSiegeObjective = null;
+		
+		SiegeTeam team = theSiege.getPlayerTeam(entityplayer);
+		if (team != null)
+		{
+			Kit kit = KitDatabase.getKit(chosenKit);
+			if (kit != null && team.isKitLimited(kit))
+			{
+				clearedLimitedKit = true;
+				setRandomChosenKit();
+				theSiege.markDirty();
+			}
+		}
 	}
 	
 	public void updateSiegeScoreboard(EntityPlayerMP entityplayer, boolean forceClear)
@@ -204,8 +231,8 @@ public class SiegePlayerData
 		if (inSiege && !forceClear)
 		{
 			// create a new siege objective, with a new name, so we can send all the scores one by one, and only then display it
-			String newObjName = "siege_" + siegeObjectiveCount;
-			siegeObjectiveCount++;
+			String newObjName = "siege" + Siege.siegeObjectiveNumber;
+			Siege.siegeObjectiveNumber++;
 			siegeObjective = new ScoreObjective(scoreboard, newObjName, null);
 			String displayName = "SiegeMode: " + theSiege.getSiegeName();
 			siegeObjective.setDisplayName(displayName);
@@ -270,13 +297,14 @@ public class SiegePlayerData
 			}
 		}
 		
+		// try disabling this to avoid the rare crash when the last objective has failed to send and it tries to remove a nonexistent objective
 		// remove last objective only AFTER sending new objective & all scores
-		if (lastSentSiegeObjective != null)
+		/*if (lastSentSiegeObjective != null)
 		{
 			Packet pkt = new S3BPacketScoreboardObjective(lastSentSiegeObjective, 1);
 			entityplayer.playerNetServerHandler.sendPacket(pkt);
 			lastSentSiegeObjective = null;
-		}
+		}*/
 		
 		// if a new objective was sent, display it
 		if (siegeObjective != null)

@@ -15,6 +15,8 @@ public class KitDatabase
 	private static Map<UUID, Kit> kitMap = new HashMap();
 	private static Map<String, UUID> kitNameMap = new HashMap();
 	
+	private static final String randomKitID = "random";
+	
 	public static Kit getKit(UUID id)
 	{
 		return kitMap.get(id);
@@ -42,7 +44,17 @@ public class KitDatabase
 	
 	public static boolean validKitName(String name)
 	{
-		return StringUtils.isAlphanumeric(name.replaceAll("_", ""));
+		return StringUtils.isAlphanumeric(name.replaceAll("_", "")) && !isRandomKitID(name);
+	}
+	
+	public static boolean isRandomKitID(String name)
+	{
+		return name.equalsIgnoreCase(randomKitID);
+	}
+	
+	public static String getRandomKitID()
+	{
+		return randomKitID;
 	}
 	
 	public static void addAndSaveKit(Kit kit)

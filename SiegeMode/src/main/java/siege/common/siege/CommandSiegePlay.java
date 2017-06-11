@@ -52,51 +52,66 @@ public class CommandSiegePlay extends CommandBase
 				Siege siege = SiegeDatabase.getSiege(siegeName);
 				if (siege != null && siege.isActive())
 				{
-					if (args.length >= 3)
+					if (siege.isPlayerInDimension(operator))
 					{
-						String teamName = args[2];
-						SiegeTeam team = siege.getTeam(teamName);
-						if (team != null)
+						if (args.length >= 3)
 						{
-							if (team.canPlayerJoin(operator))
+							String teamName = args[2];
+							SiegeTeam team = siege.getTeam(teamName);
+							if (team != null)
 							{
-								Kit kit = null;
-								if (args.length >= 4)
+								if (team.canPlayerJoin(operator))
 								{
-									String kitNameArg = args[3];
-									Kit kitArg = KitDatabase.getKit(kitNameArg);
-									if (kitArg != null && team.containsKit(kitArg))
+									Kit kit = null;
+									if (args.length >= 4)
 									{
-										kit = kitArg;
+										String kitNameArg = args[3];
+										Kit kitArg = KitDatabase.getKit(kitNameArg);
+										if (kitArg != null && team.containsKit(kitArg))
+										{
+											if (team.isKitAvailable(kitArg))
+											{
+												kit = kitArg;
+											}
+											else
+											{
+												int limit = team.getKitLimit(kitArg);
+												throw new CommandException("Kit %s is limited to %s players in team %s! Try another kit", kitArg.getKitName(), String.valueOf(limit), teamName);
+											}
+										}
 									}
+									
+									if (siege.joinPlayer(operator, team, kit))
+									{
+										if (kit == null)
+										{
+											func_152373_a(sender, this, "Joined siege %s on team %s", siegeName, teamName);
+										}
+										else
+										{
+											func_152373_a(sender, this, "Joined siege %s on team %s as kit %s", siegeName, teamName, kit.getKitName());
+										}
+									}
+									return;
 								}
-								
-								if (siege.joinPlayer(operator, team, kit))
+								else
 								{
-									if (kit == null)
-									{
-										func_152373_a(sender, this, "Joined siege %s on team %s", siegeName, teamName);
-									}
-									else
-									{
-										func_152373_a(sender, this, "Joined siege %s on team %s as kit %s", siegeName, teamName, kit.getKitName());
-									}
+									throw new CommandException("Cannot join siege %s on team %s: too many players! Try another team", siegeName, teamName);
 								}
-								return;
 							}
 							else
 							{
-								throw new CommandException("Cannot join siege %s on team %s: too many players! Try another team", siegeName, teamName);
+								throw new CommandException("Cannot join siege %s on team %s: no such team exists!", siegeName, teamName);
 							}
 						}
 						else
 						{
-							throw new CommandException("Cannot join siege %s on team %s: no such team exists!", siegeName, teamName);
+							throw new CommandException("Specify a team to join!");
 						}
 					}
 					else
 					{
-						throw new CommandException("Specify a team to join!");
+						throw new CommandException("Cannot join siege %s: you are in the wrong dimension!");
 					}
 				}
 				else
@@ -119,10 +134,25 @@ public class CommandSiegePlay extends CommandBase
 							if (args.length >= 3)
 							{
 								String kitNameArg = args[2];
-								Kit kitArg = KitDatabase.getKit(kitNameArg);
-								if (kitArg != null && team.containsKit(kitArg))
+								if (KitDatabase.isRandomKitID(kitNameArg))
 								{
-									kit = kitArg;
+									kit = null;
+								}
+								else
+								{
+									Kit kitArg = KitDatabase.getKit(kitNameArg);
+									if (kitArg != null && team.containsKit(kitArg))
+									{
+										if (team.isKitAvailable(kitArg) || kitArg.getKitID().equals(siege.getPlayerData(operator).getChosenKit()))
+										{
+											kit = kitArg;
+										}
+										else
+										{
+											int limit = team.getKitLimit(kitArg);
+											throw new CommandException("Kit %s is limited to %s players in team %s! Try another kit", kitArg.getKitName(), String.valueOf(limit), teamName);
+										}
+									}
 								}
 							}
 							
@@ -162,16 +192,34 @@ public class CommandSiegePlay extends CommandBase
 					SiegeTeam team = siege.getPlayerTeam(operator);
 					String teamName = team.getTeamName();
 					String kitName = args[1];
-					Kit kit = KitDatabase.getKit(kitName);
-					if (kit != null && team.containsKit(kit))
+					
+					if (KitDatabase.isRandomKitID(kitName))
 					{
-						siege.getPlayerData(operator).setChosenKit(kit);
-						func_152373_a(sender, this, "Switching to kit %s after death", kitName);
+						siege.getPlayerData(operator).setRandomChosenKit();
+						func_152373_a(sender, this, "Switching to random kit selection after death", kitName);
 						return;
 					}
 					else
 					{
-						throw new CommandException("Cannot switch to kit %s: no such kit exists on team %s!", kitName, teamName);
+						Kit kit = KitDatabase.getKit(kitName);
+						if (kit != null && team.containsKit(kit))
+						{
+							if (team.isKitAvailable(kit) || kit.getKitID().equals(siege.getPlayerData(operator).getChosenKit()))
+							{
+								siege.getPlayerData(operator).setChosenKit(kit);
+								func_152373_a(sender, this, "Switching to kit %s after death", kitName);
+								return;
+							}
+							else
+							{
+								int limit = team.getKitLimit(kit);
+								throw new CommandException("Kit %s is limited to %s players in team %s! Try another kit", kitName, String.valueOf(limit), teamName);
+							}
+						}
+						else
+						{
+							throw new CommandException("Cannot switch to kit %s: no such kit exists on team %s!", kitName, teamName);
+						}
 					}
 				}
 				else
@@ -239,7 +287,9 @@ public class CommandSiegePlay extends CommandBase
                 			SiegeTeam team = siege.getTeam(teamName);
                 			if (team != null)
                 			{
-                				return getListOfStringsMatchingLastWord(args, team.listKitNames().toArray(new String[0]));
+                				List<String> kitNames = team.listKitNames();
+                				kitNames.add(KitDatabase.getRandomKitID());
+                				return getListOfStringsMatchingLastWord(args, kitNames.toArray(new String[0]));
                 			}
                 		}
         			}
@@ -257,7 +307,9 @@ public class CommandSiegePlay extends CommandBase
         			SiegeTeam team = currentSiege.getTeam(teamName);
         			if (team != null)
         			{
-        				return getListOfStringsMatchingLastWord(args, team.listKitNames().toArray(new String[0]));
+        				List<String> kitNames = team.listKitNames();
+        				kitNames.add(KitDatabase.getRandomKitID());
+        				return getListOfStringsMatchingLastWord(args, kitNames.toArray(new String[0]));
         			}
         		}
         	}
@@ -266,7 +318,9 @@ public class CommandSiegePlay extends CommandBase
         		SiegeTeam team = currentSiege.getPlayerTeam(operator);
         		if (team != null)
         		{
-        			return getListOfStringsMatchingLastWord(args, team.listKitNames().toArray(new String[0]));
+    				List<String> kitNames = team.listKitNames();
+    				kitNames.add(KitDatabase.getRandomKitID());
+    				return getListOfStringsMatchingLastWord(args, kitNames.toArray(new String[0]));
         		}
         	}
         }

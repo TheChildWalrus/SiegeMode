@@ -171,6 +171,58 @@ public class CommandSiegeSetup extends CommandBase
 										return;
 									}
 								}
+								else if (teamFunction.equals("kit-limit"))
+								{
+									String kitName = args[6];
+									if (!KitDatabase.kitExists(kitName))
+									{
+										throw new CommandException("Kit %s does not exist", kitName);
+									}
+									else
+									{
+										Kit kit = KitDatabase.getKit(kitName);
+										if (!team.containsKit(kit))
+										{
+											throw new CommandException("Siege %s team %s does not include kit %s!", siegeName, teamName, kitName);
+										}
+										
+										if (args.length >= 6)
+										{
+											int limit = parseIntWithMin(sender, args[7], 0);
+											team.limitKit(kit, limit);
+											func_152373_a(sender, this, "Limited kit %s to %s players for team %s in siege %s", kitName, String.valueOf(limit), teamName, siegeName);
+											return;
+										}
+										else
+										{
+											throw new CommandException("Specify the kit limit");
+										}
+									}
+								}
+								else if (teamFunction.equals("kit-unlimit"))
+								{
+									String kitName = args[6];
+									if (!KitDatabase.kitExists(kitName))
+									{
+										throw new CommandException("Kit %s does not exist", kitName);
+									}
+									else
+									{
+										Kit kit = KitDatabase.getKit(kitName);
+										if (!team.containsKit(kit))
+										{
+											throw new CommandException("Siege %s team %s does not include kit %s!", siegeName, teamName, kitName);
+										}
+										if (!team.isKitLimited(kit))
+										{
+											throw new CommandException("Kit %s is not limited for team %s in siege %s", kitName, teamName, siegeName);
+										}
+										
+										team.unlimitKit(kit);
+										func_152373_a(sender, this, "Unlimited kit %s for team %s in siege %s", kitName, teamName, siegeName);
+										return;
+									}
+								}
 								else if (teamFunction.equals("setspawn"))
 								{
 									int spawnX = MathHelper.floor_double(func_110666_a(sender, operator.posX, args[6]));
@@ -206,6 +258,13 @@ public class CommandSiegeSetup extends CommandBase
 						int maxDiff = parseIntWithMin(sender, args[3], 0);
 						siege.setMaxTeamDifference(maxDiff);
 						func_152373_a(sender, this, "Set siege %s max team difference to %s", siegeName, String.valueOf(maxDiff));
+						return;
+					}
+					else if (sFunction.equals("respawn-immunity"))
+					{
+						int seconds = parseIntWithMin(sender, args[3], 0);
+						siege.setRespawnImmunity(seconds);
+						func_152373_a(sender, this, "Set siege %s respawn immunity to %s", siegeName, String.valueOf(seconds));
 						return;
 					}
 					else if (sFunction.equals("friendly-fire"))
@@ -387,7 +446,7 @@ public class CommandSiegeSetup extends CommandBase
     	        }
     	        if (args.length == 3)
     	        {
-    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "friendly-fire", "mob-spawning", "terrain-protect", "terrain-protect-inactive");
+    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "respawn-immunity", "friendly-fire", "mob-spawning", "terrain-protect", "terrain-protect-inactive");
     	        }
     	        if (args.length >= 4)
     	        {
@@ -415,7 +474,7 @@ public class CommandSiegeSetup extends CommandBase
     	        					SiegeTeam team = siege.getTeam(teamName);
     	        					if (args.length == 6)
     	        					{
-    	        						return getListOfStringsMatchingLastWord(args, "rename", "kit-add", "kit-remove", "setspawn");
+    	        						return getListOfStringsMatchingLastWord(args, "rename", "kit-add", "kit-remove", "kit-limit", "kit-unlimit", "setspawn");
     	        					}
     	        					if (args.length >= 7)
     	        					{
@@ -424,7 +483,7 @@ public class CommandSiegeSetup extends CommandBase
     	            					{
     	            						return getListOfStringsMatchingLastWord(args, team.listUnincludedKitNames().toArray(new String[0]));
     	            					}
-    	            					if (teamFunction.equals("kit-remove"))
+    	            					else if (teamFunction.equals("kit-remove") || teamFunction.equals("kit-limit") || teamFunction.equals("kit-unlimit"))
     	            					{
     	            						return getListOfStringsMatchingLastWord(args, team.listKitNames().toArray(new String[0]));
     	            					}
