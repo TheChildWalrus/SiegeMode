@@ -1,4 +1,4 @@
-=== Siege Mode ===
+# Siege Mode
 
 Siege Mode is a server-side mod, or plugin, designed to facilitate the running of 'mock sieges' on servers. These are essentially minigame battles, for fun.
 
@@ -13,11 +13,11 @@ Players do NOT need to install the mod to play it on a server! The mod only need
 
 The mod is still in development. There are other features planned, including new game modes and victory conditions.
 
-=== Features ===
+# Features
 
 The primary features of the Siege Mode mod are as follows:
 
-== Sieges ==
+## Sieges
 
 Sieges are ongoing player battles, centred around specific locations, with teams set against one another.
 (The name 'siege', while not strictly accurate, is used because that's what people like to call these events.)
@@ -27,7 +27,7 @@ It is possible to set protection upon the terrain within the bounds of the arena
 
 During a siege, players do not use their own items. Instead, kits are used. (see below)
 
-== Teams ==
+## Teams
 
 A siege must have teams for players to join.  It is possible to create more than two teams.
 
@@ -37,7 +37,7 @@ Each team has a pre-defined list of kits. Optionally, these kits can be limited 
 
 It is possible to set a 'max team difference' for balance, so that new players cannot join a team if it has too many players.
 
-== Kits ==
+## Kits
 
 Kits are inventory presets used in the sieges, essentially 'classes' for players to choose between.
 Server admins can create kits using the /siege_kit command. (see below)
@@ -48,7 +48,7 @@ Any active potion effects are also copied.
 Importantly, kits are independent from sieges. One kit can be reused across multiple sieges, and if edited, the changes will apply when used in all sieges.
 However, it is advised to design independent kits for different sieges: so that one admin may change their kits without fear of upsetting the balance of other sieges.
 
-== Joining and Leaving Sieges ==
+## Joining and Leaving Sieges
 
 Players may join a siege at any time, using the /siege_play command. (see below)
 Before joining a siege you *must* have emptied all items from your inventory (including armour) and if not, a chat message will appear informing you to put your items away.
@@ -59,7 +59,7 @@ Players can change to another available kit at any point (unless it's limited) o
 
 Players can leave the siege at any time using the /siege_play command, and upon doing so their inventory will be cleared.
 
-== Victory ==
+## Victory
 
 The winner of the siege is the team who have collectively killed the most opponents when the timer runs out.
 
@@ -69,19 +69,19 @@ Players' inventories are cleared when the siege ends.
 
 In the future, among other features, I hope to add new victory conditions, as well as optional rewards for the winning team.
 
-== Scoreboard ==
+## Scoreboard
 
 The mod exploits the vanilla scoreboard system to provide a display of various statistics during a siege. These include kill/death count, killstreak, team name, time remaining...
 Since the mod is server-side, it cannot alter any aspect of the scoreboard's appearance on-screen. The scoreboard is drawn by the client; the server only sends the data.
 
-== Commands ==
+## Commands
 
 Here follows a complete list of all commands included in the mod and their usage.
 
 The commands are:
-/siege_play - for players, to join the siege
-/siege_setup - for admins, to create, edit, and run sieges
-/siege_kit - for admins, to manage the kits used in sieges
+```/siege_play``` - for players, to join the siege
+```/siege_setup``` - for admins, to create, edit, and run sieges
+```/siege_kit``` - for admins, to manage the kits used in sieges
 
 NOTE: Use TAB key to autocomplete command parameters.
 Players can use TAB to cycle through the available team / kit names when joining a siege.
@@ -89,17 +89,19 @@ The character ~ can be used in place of coordinate parameters to refer to the op
 
 ...
 
-== /siege_play... (for players) ==
+### ```/siege_play```... (for players)
 
+```
 /siege_play join [siege-name] [team-name] [kit-name]
 /siege_play team [team-name] [kit-name]
 /siege_play kit [kit-name]
 /siege_play leave
-
+```
 ...
 
-== /siege_setup... (for admins) ==
+### ```/siege_setup```... (for admins)
 
+```
 /siege_setup new [siege-name]
 
 /siege_setup edit [siege-name] rename [name]
@@ -127,17 +129,18 @@ The character ~ can be used in place of coordinate parameters to refer to the op
 /siege_setup active [siege-name] end
 
 /siege_setup delete [siege-name]
-
+```
 ...
 
-== /siege_kit... (for admins) ==
+### ```/siege_kit```... (for admins)
 
+```
 /siege_kit new [kit-name] [player]
 /siege_kit apply [kit-name] [player]
 /siege_kit edit [kit-name] rename [name]
 /siege_kit edit [kit-name] recreate [player]
 /siege_kit delete [kit-name]
-
+```
 ...
 
 Have fun!
