@@ -147,7 +147,7 @@ public class Siege
 		int smallestSize = -1;
 		for (SiegeTeam team : siegeTeams)
 		{
-			int size = team.playerCount();
+			int size = team.onlinePlayerCount();
 			if (!flag || size < smallestSize)
 			{
 				smallestSize = size;
@@ -719,6 +719,8 @@ public class Siege
 					team.leavePlayer(entityplayer);
 					nextTeam.joinPlayer(entityplayer);
 					team = getPlayerTeam(entityplayer);
+					
+					playerData.onTeamChange();
 					
 					messageAllSiegePlayers(entityplayer.getCommandSenderName() + " is now playing on team " + team.getTeamName());
 				}

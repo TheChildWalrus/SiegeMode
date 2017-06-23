@@ -68,7 +68,7 @@ public class SiegeTeam
 		return teamPlayers;
 	}
 	
-	public int playerCount()
+	public int onlinePlayerCount()
 	{
 		int i = 0;
 		List playerList = MinecraftServer.getServer().getConfigurationManager().playerEntityList;
@@ -85,9 +85,9 @@ public class SiegeTeam
 	
 	public boolean canPlayerJoin(EntityPlayer entityplayer)
 	{
-		int count = playerCount();
+		int count = onlinePlayerCount();
 		int lowestCount = theSiege.getSmallestTeamSize();
-		if (count - lowestCount > theSiege.getMaxTeamDifference())
+		if (count - lowestCount >= theSiege.getMaxTeamDifference())
 		{
 			return false;
 		}

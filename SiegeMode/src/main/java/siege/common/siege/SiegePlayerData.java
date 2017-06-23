@@ -190,6 +190,15 @@ public class SiegePlayerData
 		return longestKillstreak;
 	}
 	
+	public void onTeamChange()
+	{
+		kills = 0;
+		deaths = 0;
+		killstreak = 0;
+		longestKillstreak = 0;
+		theSiege.markDirty();
+	}
+	
 	public void onLogin(EntityPlayerMP entityplayer)
 	{
 		if (clearedLimitedKit)
