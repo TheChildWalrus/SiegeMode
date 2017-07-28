@@ -89,6 +89,7 @@ public class EventHandler
 					Kit.clearPlayerInvAndKit(entityplayer);
 				}
 				Siege.setHasSiegeGivenKit(entityplayer, false);
+				Siege.dispel(entityplayer);
 			}
 		}
 	}

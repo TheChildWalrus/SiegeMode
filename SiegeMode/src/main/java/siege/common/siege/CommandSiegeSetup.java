@@ -331,6 +331,22 @@ public class CommandSiegeSetup extends CommandBase
 							return;
 						}
 					}
+					else if (sFunction.equals("dispel"))
+					{
+						String tOption = args[3];
+						if (tOption.equals("on"))
+						{
+							siege.setDispelOnEnd(true);
+							func_152373_a(sender, this, "Enabled dispel-on-end in siege %s", siegeName);
+							return;
+						}
+						else if (tOption.equals("off"))
+						{
+							siege.setDispelOnEnd(false);
+							func_152373_a(sender, this, "Disabled dispel-on-end in siege %s", siegeName);
+							return;
+						}
+					}
 				}
 				else
 				{
@@ -446,7 +462,7 @@ public class CommandSiegeSetup extends CommandBase
     	        }
     	        if (args.length == 3)
     	        {
-    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "respawn-immunity", "friendly-fire", "mob-spawning", "terrain-protect", "terrain-protect-inactive");
+    	        	return getListOfStringsMatchingLastWord(args, "rename", "setcoords", "teams", "max-team-diff", "respawn-immunity", "friendly-fire", "mob-spawning", "terrain-protect", "terrain-protect-inactive", "dispel");
     	        }
     	        if (args.length >= 4)
     	        {
@@ -496,7 +512,7 @@ public class CommandSiegeSetup extends CommandBase
     	        			}
     	        		}
     	        	}
-    	        	else if (sFunction.equals("friendly-fire") || sFunction.equals("mob-spawning") || sFunction.equals("terrain-protect") || sFunction.equals("terrain-protect-inactive"))
+    	        	else if (sFunction.equals("friendly-fire") || sFunction.equals("mob-spawning") || sFunction.equals("terrain-protect") || sFunction.equals("terrain-protect-inactive") || sFunction.equals("dispel"))
     	        	{
     	        		return getListOfStringsMatchingLastWord(args, "on", "off");
     	        	}

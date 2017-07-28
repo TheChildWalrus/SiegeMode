@@ -1,5 +1,6 @@
 1.1:
 
++ Added a 'dispel' setting for sieges, which returns players to the world spawn point at the end of the siege
 * Switching teams now clears player statistics, to prevent situations where a player would earn MVP after switching team for their deeds on the original team
 * Fixed team max difference allowing one more player difference than it should
 

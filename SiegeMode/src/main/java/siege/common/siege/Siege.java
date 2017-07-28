@@ -49,6 +49,7 @@ public class Siege
 	private boolean mobSpawning = false;
 	private boolean terrainProtect = true;
 	private boolean terrainProtectInactive = false;
+	private boolean dispelOnEnd = false;
 	
 	private Map<UUID, SiegePlayerData> playerDataMap = new HashMap();
 	private static final int KILLSTREAK_ANNOUNCE = 3;
@@ -273,6 +274,17 @@ public class Siege
 	public void setTerrainProtectInactive(boolean flag)
 	{
 		terrainProtectInactive = flag;
+		markDirty();
+	}
+	
+	public boolean getDispelEnd()
+	{
+		return dispelOnEnd;
+	}
+	
+	public void setDispelOnEnd(boolean flag)
+	{
+		dispelOnEnd = flag;
 		markDirty();
 	}
 	
@@ -579,6 +591,11 @@ public class Siege
 		
 		UUID playerID = entityplayer.getUniqueID();
 		playerDataMap.remove(playerID);
+		
+		if (dispelOnEnd)
+		{
+			dispel(entityplayer);
+		}
 	}
 	
 	public static void messagePlayer(EntityPlayer entityplayer, String text)
@@ -644,7 +661,7 @@ public class Siege
 					messagePlayer(entityplayer, "Stay inside the siege area!");
 				}
 				
-				FMLInterModComms.sendRuntimeMessage(SiegeMode.instance, "lotr", "FS_DISABLE", entityplayer.getCommandSenderName());
+				FMLInterModComms.sendRuntimeMessage(SiegeMode.instance, "lotr", "SIEGE_ACTIVE", entityplayer.getCommandSenderName());
 			}
 			else
 			{
@@ -799,6 +816,15 @@ public class Siege
 		entityplayer.getEntityData().setBoolean("HasSiegeKit", flag);
 	}
 	
+	public static void dispel(EntityPlayer entityplayer)
+	{
+		ChunkCoordinates spawnCoords = entityplayer.worldObj.getSpawnPoint();
+		if (spawnCoords != null)
+		{
+			entityplayer.setPositionAndUpdate(spawnCoords.posX + 0.5D, spawnCoords.posY + 0.5D, spawnCoords.posZ + 0.5D);
+		}
+	}
+	
 	public void onPlayerLogin(EntityPlayerMP entityplayer)
 	{
 		SiegePlayerData playerData = getPlayerData(entityplayer);
@@ -877,6 +903,7 @@ public class Siege
 		nbt.setBoolean("TerrainProtect", terrainProtect);
 		nbt.setBoolean("TerrainProtectInactive", terrainProtectInactive);
 		nbt.setInteger("RespawnImmunity", respawnImmunity);
+		nbt.setBoolean("Dispel", dispelOnEnd);
 		
 		NBTTagList playerTags = new NBTTagList();
 		for (Entry<UUID, SiegePlayerData> e : playerDataMap.entrySet())
@@ -927,6 +954,10 @@ public class Siege
 		if (nbt.hasKey("RespawnImmunity"))
 		{
 			respawnImmunity = nbt.getInteger("RespawnImmunity");
+		}
+		if (nbt.hasKey("Dispel"))
+		{
+			dispelOnEnd = nbt.getBoolean("Dispel");
 		}
 		
 		playerDataMap.clear();

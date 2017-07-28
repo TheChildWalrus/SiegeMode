@@ -25,6 +25,8 @@ Sieges are ongoing player battles, centred around specific locations, with teams
 A siege has a central location, and a defined radius, which together define a circular 'arena'. While the siege is active, the participants are prevented from leaving the arena, and anyone else is prevented from entering.
 It is possible to set protection upon the terrain within the bounds of the arena: both while the siege is active, and/or while it is inactive. This setting prevents anyone from placing or breaking blocks, and opening containers, but does not prevent interacting with other blocks such as doors and gates.
 
+There is an optional setting to force the siege, upon ending, to dispel all players from the area. If enabled, players will be returned to the world spawn point.
+
 During a siege, players do not use their own items. Instead, kits are used. (see below)
 
 ## Teams
@@ -123,6 +125,7 @@ The character ~ can be used in place of coordinate parameters to refer to the op
 /siege_setup edit [siege-name] mob-spawning [on|off]
 /siege_setup edit [siege-name] terrain-protect [on|off]
 /siege_setup edit [siege-name] terrain-protect-inactive [on|off]
+/siege_setup edit [siege-name] dispel [on|off]
 
 /siege_setup start [siege-name] [seconds]
 /siege_setup active [siege-name] extend [seconds]
