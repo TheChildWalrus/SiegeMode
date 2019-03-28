@@ -201,7 +201,7 @@ public class EventHandler
 			Siege activeSiege = SiegeDatabase.getActiveSiegeForPlayer(entityplayer);
 			if (activeSiege != null && !entityplayer.capabilities.isCreativeMode)
 			{
-				activeSiege.messagePlayer(entityplayer, "You cannot drop items during a siege");
+				activeSiege.warnPlayer(entityplayer, "You cannot drop items during a siege");
 				event.setCanceled(true);
 				return;
 			}

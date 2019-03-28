@@ -56,7 +56,7 @@ public class SiegeTerrainProtection
 		
 		if (send)
 		{
-			Siege.messagePlayer(entityplayer, message);
+			Siege.warnPlayer(entityplayer, message);
 			lastPlayerMsgTimes.put(playerID, currentTimeMs);
 		}
 	}

@@ -14,7 +14,7 @@ import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = "siegemode", version = "1.0", acceptableRemoteVersions = "*")
+@Mod(modid = "siegemode", version = "1.2", acceptableRemoteVersions = "*")
 public class SiegeMode
 {
 	@Mod.Instance

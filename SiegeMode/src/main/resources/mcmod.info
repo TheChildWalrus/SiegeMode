@@ -2,7 +2,7 @@
 {
 	"modid" : "siegemode",
 	"name" : "Siege Mode",
-	"version" : "1.0",
+	"version" : "1.2",
 	"credits" : "",
 	"authorList": ["Mevans"],
 	"description": "A server-side mod designed to facilitate sieges and other events for servers running the Lord of the Rings Mod.",
